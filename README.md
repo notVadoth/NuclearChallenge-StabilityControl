@@ -5,6 +5,7 @@ A bench-scale analogue of reactor control for the 2026 Nuclear Innovation Challe
 Built on the challenge's base code: [IdeasClinicUWaterloo/F26-NuclearIC](https://github.com/IdeasClinicUWaterloo/F26-NuclearIC) (fork: [notVadoth/F26-NuclearIC](https://github.com/notVadoth/F26-NuclearIC)).
 
 Canva view link: https://canva.link/ud9t2yi2hbv6vku
+
 Google docs view link: https://docs.google.com/document/d/1-GoW5N-BXc-cunrPMzWbaOq6qewn9IFudRMmZFtr4vw/edit?usp=sharing
 
 ## Contents
