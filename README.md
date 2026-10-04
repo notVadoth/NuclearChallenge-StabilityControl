@@ -73,8 +73,12 @@ Runs vary by about ±10 mL, so volumes in the app are estimates.
 ## Roadmap
 
 1. Show and enter concentration in mL dye / mL total (app currently displays mL per litre, i.e. x1000).
-2. iPhone camera (as a webcam) to measure tank and reservoir levels: real level control, refill and empty-waste requests, self-correcting flow rates.
-3. Data logging, state estimator and a mass-balance model of the tank.
-4. Separate safety supervisor (NORMAL / WARNING / LIMITING / SCRAM) and fault detection.
-5. Forward prediction (time to limit) and an advisor that recommends actions.
-6. Couple the measured concentration to the base repo's reactor simulator so the tank drives simulated reactor power under grid-demand scenarios.
+
+
+<img width="2480" height="3307" alt="image" src="https://github.com/user-attachments/assets/34f3bfd6-7a9e-4a0e-ab86-6b3468b03cc5" />
+
+3. iPhone camera (as a webcam) to measure tank and reservoir levels: real level control, refill and empty-waste requests, self-correcting flow rates.
+4. Data logging, state estimator and a mass-balance model of the tank.
+5. Separate safety supervisor (NORMAL / WARNING / LIMITING / SCRAM) and fault detection.
+6. Forward prediction (time to limit) and an advisor that recommends actions.
+7. Couple the measured concentration to the base repo's reactor simulator so the tank drives simulated reactor power under grid-demand scenarios.
