@@ -1,0 +1,452 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Beaker Level Camera</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Semi+Condensed:wght@500;600;700&display=swap">
+<style>
+:root {
+  --bg: #e6eaed;
+  --panel: #f6f8f9;
+  --ink: #1c2630;
+  --ink-soft: #5b6873;
+  --rule: #c9d1d7;
+  --dye: #2f9e5b;
+  --clear: #2e7fb8;
+  --waste: #8a6d3b;
+  --stop: #c8312b;
+  --ok: #2f9e5b;
+  --warn: #c98a12;
+  --font: "Barlow", system-ui, "Segoe UI", sans-serif;
+  --font-cond: "Barlow Semi Condensed", "Barlow", system-ui, "Segoe UI", sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #161c21;
+    --panel: #1f272e;
+    --ink: #e7ecef;
+    --ink-soft: #9aa7b1;
+    --rule: #33404a;
+    --dye: #3dbb72;
+    --clear: #4a9bd6;
+    --waste: #b8925a;
+    --stop: #e0473f;
+  }
+  .pump .toggle { color: #10161b; }
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font: 16px/1.45 var(--font);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+button, input { font: inherit; color: inherit; }
+button { cursor: pointer; }
+body { padding: 0 16px; }
+.btn {
+  border: 1px solid var(--ink);
+  background: transparent;
+  border-radius: 6px;
+  padding: 9px 18px;
+  font-weight: 600;
+}
+.btn.primary { background: var(--ink); color: var(--panel); }
+.btn:not(:disabled):hover { filter: brightness(1.12); }
+
+/* ---------------- Beaker level camera ---------------- */
+.cam {
+  margin: 24px auto; max-width: 1200px;
+  background: var(--panel);
+  border: 1px solid var(--rule);
+  border-left: 6px solid var(--clear);
+  border-radius: 8px;
+  padding: 18px 22px;
+  display: grid;
+  grid-template-columns: minmax(280px, 460px) 1fr;
+  gap: 24px;
+}
+.cam h1 { font: 700 24px/1 var(--font-cond); margin: 0 0 4px; }
+.cam .lead { color: var(--ink-soft); font-size: 15px; margin: 0 0 12px; max-width: 62ch; }
+.cam .view { position: relative; background: #000; border-radius: 6px; overflow: hidden; aspect-ratio: 4 / 3; }
+.cam video, .cam canvas.ov { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
+.cam canvas.ov { cursor: crosshair; }
+.cam .view .empty[hidden] { display: none; }
+.cam .view .empty { position: absolute; inset: 0; display: grid; place-items: center; color: #9aa7b1; font-size: 14px; text-align: center; padding: 20px; }
+.cam .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-top: 10px; font-size: 14px; }
+.cam select, .cam input[type=number] {
+  border: 1px solid var(--rule); border-radius: 6px; background: var(--bg);
+  padding: 6px 8px; font: inherit; color: var(--ink);
+}
+.cam input[type=number] { width: 80px; }
+.cam .big { font: 700 44px/1 var(--font-cond); }
+.cam .big small { font: 600 18px/1 var(--font-cond); color: var(--ink-soft); margin-left: 6px; }
+.cam .sub { color: var(--ink-soft); font-size: 15px; margin-top: 6px; }
+.cam .flag { margin-top: 8px; font-size: 14px; font-weight: 600; color: var(--warn); }
+.cam .flag.bad { color: var(--stop); }
+.cam .flag.ok { color: var(--ok); }
+.cam ol { margin: 8px 0 0; padding-left: 20px; font-size: 14px; color: var(--ink-soft); max-width: 60ch; }
+.cam ol li { margin: 3px 0; }
+.cam .btn.active { background: var(--clear); border-color: var(--clear); color: #fff; }
+@media (max-width: 900px) { .cam { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<section class="cam" id="cam" aria-labelledby="camTitle">
+  <div>
+    <h1 id="camTitle">Beaker level camera</h1>
+    <div class="view">
+      <video id="camVideo" playsinline muted></video>
+      <canvas class="ov" id="camOverlay" aria-label="Camera view with the measuring strip and detected water line"></canvas>
+      <div class="empty" id="camEmpty">Pick the phone camera and click Start camera.</div>
+    </div>
+    <div class="row">
+      <select id="camSel" aria-label="Camera"><option value="">Camera…</option></select>
+      <button class="btn" id="camStart">Start camera</button>
+      <button class="btn" id="camStop" disabled>Stop</button>
+    </div>
+  </div>
+  <div>
+    <p class="lead">Your phone, used as a webcam, watches the reactor beaker. The page finds the water line in a narrow strip and converts it to mL from two marks you click once.</p>
+    <div class="big" id="camLevel">–</div>
+    <div class="sub" id="camSub">Not measuring.</div>
+    <div class="flag" id="camFlag" hidden></div>
+    <div class="row">
+      <label>Mark A (mL) <input type="number" id="camMlA" value="350" step="10"></label>
+      <button class="btn" id="camPickA" disabled>Click mark A on video</button>
+    </div>
+    <div class="row">
+      <label>Mark B (mL) <input type="number" id="camMlB" value="450" step="10"></label>
+      <button class="btn" id="camPickB" disabled>Click mark B on video</button>
+    </div>
+    <div class="row">
+      <label>Strip position <input type="range" id="camShift" min="-200" max="200" value="0" style="width:180px"></label>
+      <label>Strip width <input type="number" id="camWidth" min="6" max="120" value="40"></label>
+    </div>
+    <div class="row">
+      <label>Find the surface by <select id="camMode">
+        <option value="auto">Auto (clearest line)</option>
+        <option value="green">Green liquid (strongly dyed water)</option>
+        <option value="edge">Any edge (clear or faint water)</option>
+      </select></label>
+    </div>
+    <ol>
+      <li>On the phone and laptop, install a webcam app (Camo, Iriun or DroidCam) so the phone shows up as a camera here.</li>
+      <li>Fix the phone so it sees the beaker side-on, with the liquid line inside the view. It must not move afterwards.</li>
+      <li>Click <b>Mark A</b>, then click a known level on the beaker (for example the 350 mL line). Do the same for <b>Mark B</b> at a second level.</li>
+      <li>Slide the strip onto a clear part of the beaker, away from labels and tape. Clear water shows up best with a striped paper behind the beaker.</li>
+    </ol>
+  </div>
+</section>
+
+<script>
+// Beaker level camera: finds the water line in a phone/webcam picture and
+// converts it to mL. Extracted from the Nuclear Challenge pump control app
+// (Controls and Instrumentation) as a standalone page; no Arduino needed.
+//
+// Output for other code on the same page:
+//   window.levelTrusted()      true when the current reading can be used
+//   window.levelWhy()          plain-English reason when it cannot
+//   'beakerlevel' event        detail = { ml, trusted, t } about 4 times a second
+// Timers that keep running when this window is minimised or covered. Chrome slows
+// page timers to once a second when hidden and to once a MINUTE after 5 minutes,
+// which would starve the Arduino's 3 s watchdog (pumps stop "at random") and the
+// level camera. Timers inside a worker are not slowed. Falls back to normal timers.
+const steady = (() => {
+  const cbs = new Map(); let next = 1, w = null;
+  try {
+    const src = 'const T={};onmessage=e=>{const[id,ms,rep]=e.data;if(ms<0){clearTimeout(T[id]);clearInterval(T[id]);delete T[id];return;}T[id]=(rep?setInterval:setTimeout)(()=>{postMessage(id);if(!rep)delete T[id];},ms);};';
+    w = new Worker(URL.createObjectURL(new Blob([src], { type: 'text/javascript' })));
+    w.onmessage = e => { const c = cbs.get(e.data); if (!c) return; if (!c.rep) cbs.delete(e.data); c.fn(); };
+    w.onerror = () => { w = null; for (const [id, c] of cbs) { c.h = (c.rep ? setInterval : setTimeout)(c.fn, c.ms); } };
+  } catch { w = null; }
+  const start = (fn, ms, rep) => {
+    const id = next++, c = { fn, ms, rep };
+    cbs.set(id, c);
+    if (w) w.postMessage([id, ms, rep]); else c.h = (rep ? setInterval : setTimeout)(() => { if (!rep) cbs.delete(id); fn(); }, ms);
+    return id;
+  };
+  return {
+    setTimeout: (fn, ms) => start(fn, ms, false),
+    setInterval: (fn, ms) => start(fn, ms, true),
+    clear(id) { const c = cbs.get(id); if (!c) return; cbs.delete(id); if (w) w.postMessage([id, -1]); clearTimeout(c.h); clearInterval(c.h); },
+    get worker() { return !!w; },
+  };
+})();
+
+
+// ===================== Beaker level from a phone camera =====================
+// The phone appears as a webcam (Camo / Iriun / DroidCam). In a narrow vertical
+// strip over the beaker, each row's average colour is compared with the rows
+// above and below it; the strongest change is the liquid surface. Two clicked
+// marks of known volume map image height to mL (straight-sided beaker).
+const CAM_KEY = 'dyeRigLevelCamera';
+const cam = {
+  stream: null, timer: null, picking: null, hist: [], level: NaN, conf: 0, t: 0, lineY: NaN,
+  cfg: { ax: NaN, ay: NaN, by: NaN, mlA: 350, mlB: 450, shift: 0, width: 40, use: false, deviceId: '', mode: 'auto' },
+};
+const cEl = id => document.getElementById(id);
+try { Object.assign(cam.cfg, JSON.parse(localStorage.getItem(CAM_KEY)) || {}); } catch {}
+function camSave() { try { localStorage.setItem(CAM_KEY, JSON.stringify(cam.cfg)); } catch {} }
+cEl('camMlA').value = cam.cfg.mlA; cEl('camMlB').value = cam.cfg.mlB;
+cEl('camShift').value = cam.cfg.shift; cEl('camWidth').value = cam.cfg.width;
+if (cam.cfg.v !== 2) { cam.cfg.mode = 'auto'; cam.cfg.v = 2; }   // new default after the glare/auto update
+if (cam.cfg.mode !== 'green' && cam.cfg.mode !== 'edge') cam.cfg.mode = 'auto';
+cEl('camMode').value = cam.cfg.mode;
+cEl('camMode').onchange = () => { cam.cfg.mode = cEl('camMode').value; cam.hist = []; cam.used = null; camSave(); };
+
+// Level is trusted when the camera is running, calibrated, confident and fresh.
+window.levelTrusted = () => !!cam.stream && Number.isFinite(cam.level) && cam.conf >= 1 && Date.now() - cam.t < 3000;
+window.levelWhy = () => {
+  if (!cam.stream) return 'the camera is not started (click Start camera in the Beaker level camera panel)';
+  if (!calibrated()) return 'the camera is not calibrated (click mark A and mark B on the video)';
+  if (!Number.isFinite(cam.level) || Date.now() - cam.t > 3000) return 'the camera has no recent reading';
+  if (cam.diag?.frozen) return 'the camera picture has frozen (phone locked or webcam app paused)';
+  if (!cam.conf) return 'the water line is unclear (red line): move the strip or put striped paper behind the beaker';
+  return 'the camera is not measuring the level';
+};
+
+async function camList() {
+  try {
+    const devs = (await navigator.mediaDevices.enumerateDevices()).filter(d => d.kind === 'videoinput');
+    const sel = cEl('camSel'), cur = sel.value || cam.cfg.deviceId;
+    sel.innerHTML = '<option value="">Camera…</option>' + devs.map((d, i) => `<option value="${d.deviceId}">${d.label || `Camera ${i + 1}`}</option>`).join('');
+    if (devs.some(d => d.deviceId === cur)) sel.value = cur;
+  } catch {}
+}
+async function camStart() {
+  if (!navigator.mediaDevices?.getUserMedia) { camMsg('This browser cannot use cameras. Use Chrome or Edge.', 'bad'); return; }
+  camStop();
+  const id = cEl('camSel').value;
+  try {
+    cam.stream = await navigator.mediaDevices.getUserMedia({ video: id ? { deviceId: { exact: id }, width: { ideal: 1280 } } : { width: { ideal: 1280 } }, audio: false });
+  } catch (e) { camMsg(`Could not open the camera (${e.name}). Check the webcam app is running and allowed.`, 'bad'); return; }
+  const v = cEl('camVideo');
+  v.srcObject = cam.stream; await v.play().catch(() => {});
+  cam.cfg.deviceId = cam.stream.getVideoTracks()[0]?.getSettings().deviceId || id; camSave();
+  await camList();
+  cEl('camEmpty').hidden = true;
+  cam.hist = []; cam.level = NaN; cam.used = null;
+  cam.timer = steady.setInterval(camTick, 250);
+  cam.same = 0; cam.sum = null;
+  camButtons();
+}
+function camStop() {
+  steady.clear(cam.timer); cam.timer = null;
+  if (cam.stream) cam.stream.getTracks().forEach(t => t.stop());
+  cam.stream = null; cam.level = NaN; cam.picking = null;
+  cEl('camEmpty').hidden = false;
+  camButtons(); camShow();
+}
+function camButtons() {
+  const on = !!cam.stream;
+  cEl('camStart').disabled = on; cEl('camStop').disabled = !on;
+  cEl('camPickA').disabled = !on; cEl('camPickB').disabled = !on;
+  cEl('camPickA').classList.toggle('active', cam.picking === 'A');
+  cEl('camPickB').classList.toggle('active', cam.picking === 'B');
+}
+function camMsg(text, cls = '') { const f = cEl('camFlag'); f.hidden = !text; f.textContent = text || ''; f.className = `flag ${cls}`; }
+
+// Map a click on the overlay to video pixel coordinates (video is letterboxed).
+function toVideo(e) {
+  const v = cEl('camVideo'), r = cEl('camOverlay').getBoundingClientRect();
+  const vw = v.videoWidth, vh = v.videoHeight, s = Math.min(r.width / vw, r.height / vh);
+  const ox = (r.width - vw * s) / 2, oy = (r.height - vh * s) / 2;
+  return { x: (e.clientX - r.left - ox) / s, y: (e.clientY - r.top - oy) / s };
+}
+cEl('camOverlay').addEventListener('click', e => {
+  if (!cam.picking || !cam.stream) return;
+  const p = toVideo(e);
+  if (cam.picking === 'A') { cam.cfg.ax = p.x; cam.cfg.ay = p.y; cam.cfg.shift = 0; cEl('camShift').value = 0; }
+  else cam.cfg.by = p.y;
+  cam.picking = null; cam.hist = []; cam.used = null; camSave(); camButtons();
+});
+cEl('camPickA').onclick = () => { cam.picking = cam.picking === 'A' ? null : 'A'; camButtons(); camMsg('Click the level of mark A on the video.'); };
+cEl('camPickB').onclick = () => { cam.picking = cam.picking === 'B' ? null : 'B'; camButtons(); camMsg('Click the level of mark B on the video.'); };
+cEl('camMlA').oninput = () => { cam.cfg.mlA = +cEl('camMlA').value; cam.hist = []; camSave(); };
+cEl('camMlB').oninput = () => { cam.cfg.mlB = +cEl('camMlB').value; cam.hist = []; camSave(); };
+cEl('camShift').oninput = () => { cam.cfg.shift = +cEl('camShift').value; cam.hist = []; camSave(); };
+cEl('camWidth').oninput = () => { cam.cfg.width = Math.max(6, Math.min(120, +cEl('camWidth').value || 40)); cam.hist = []; camSave(); };
+cEl('camStart').onclick = camStart;
+cEl('camStop').onclick = camStop;
+cEl('camSel').onchange = () => { if (cam.stream) camStart(); };
+navigator.mediaDevices?.addEventListener?.('devicechange', camList);
+camList();
+
+const camCanvas = document.createElement('canvas');
+const camCtx = camCanvas.getContext('2d', { willReadFrequently: true });
+function calibrated() { const c = cam.cfg; return Number.isFinite(c.ax) && Number.isFinite(c.ay) && Number.isFinite(c.by) && Math.abs(c.by - c.ay) > 8 && c.mlA !== c.mlB; }
+
+function camTick() {
+  const v = cEl('camVideo');
+  if (!v.videoWidth) return;
+  const W = v.videoWidth, H = v.videoHeight;
+  if (camCanvas.width !== W) { camCanvas.width = W; camCanvas.height = H; }
+  camCtx.drawImage(v, 0, 0, W, H);
+  const c = cam.cfg;
+  if (calibrated()) {
+    const span = Math.abs(c.by - c.ay);
+    const x0 = Math.round(Math.max(0, Math.min(W - c.width, c.ax + c.shift - c.width / 2)));
+    const y0 = Math.round(Math.max(0, Math.min(c.ay, c.by) - 0.6 * span));
+    const y1 = Math.round(Math.min(H - 1, Math.max(c.ay, c.by) + 0.6 * span));
+    const img = camCtx.getImageData(x0, y0, c.width, y1 - y0 + 1).data;
+    const rows = y1 - y0 + 1;
+    // Frozen picture: a live camera always has some pixel noise. If the strip is
+    // byte-for-byte identical for 2 s, the feed has stopped (phone locked, webcam
+    // app paused, or this window hidden), so the level must not be trusted.
+    let sum = 0; for (let i = 0; i < img.length; i += 7) sum = (sum * 31 + img[i]) | 0;
+    cam.same = sum === cam.sum ? (cam.same || 0) + 1 : 0; cam.sum = sum;
+    const frozen = cam.same >= 8;
+    // Per row, take the MEDIAN across the strip's columns, so a thin tube, label or
+    // reflection covering a few columns cannot drag the row's value.
+    const med = a => { a.sort((x, y) => x - y); return a[a.length >> 1]; };
+    // Glare: pixels at or near full brightness (the LED's reflection) carry no
+    // information and their edges look like water lines, so they are left out.
+    // A row that is mostly glare is marked and no line is accepted next to it.
+    const GLARE = 225;
+    const green = [], rgb = [], glare = [];
+    for (let r = 0; r < rows; r++) {
+      const cg = [], cr = [], cgg = [], cb = [];
+      for (let k = 0; k < c.width; k++) {
+        const i = (r * c.width + k) * 4, R = img[i], G = img[i + 1], B = img[i + 2];
+        if (R + G + B >= 3 * GLARE || Math.max(R, G, B) >= 253) continue;   // near-white or clipped
+        cg.push(G - (R + B) / 2);            // greenness: how much greener than red and blue
+        cr.push(R); cgg.push(G); cb.push(B);
+      }
+      const isGlare = cg.length < 0.4 * c.width;
+      glare.push(isGlare);
+      green.push(isGlare ? NaN : med(cg));
+      rgb.push(isGlare ? [NaN, NaN, NaN] : [med(cr), med(cgg), med(cb)]);
+    }
+    const K = 8;
+    const nearGlare = r => { for (let k = -K; k <= K; k++) if (glare[r + k]) return true; return false; };
+    const gScore = new Array(rows).fill(0), eScore = new Array(rows).fill(0);
+    for (let r = K; r < rows - K; r++) {
+      if (nearGlare(r)) continue;
+      // Any strong change in colour or brightness (clear or faintly dyed water).
+      let d = 0;
+      for (let ch = 0; ch < 3; ch++) {
+        let a = 0, b = 0;
+        for (let k = 1; k <= K; k++) { a += rgb[r - k][ch]; b += rgb[r + k][ch]; }
+        d += ((a - b) / K) ** 2;
+      }
+      eScore[r] = Math.sqrt(d);
+      // Green dye: the surface is where it turns GREEN BELOW and is not green above.
+      let a = 0, b = 0;
+      for (let k = 1; k <= K; k++) { a += green[r - k]; b += green[r + k]; }
+      gScore[r] = (b - a) / K;
+    }
+    const pick = (score, minStrength) => {
+      let best = K;
+      for (let r = K; r < rows - K; r++) if (score[r] > score[best]) best = r;
+      const typical = med(score.slice(K, rows - K).filter((_, i) => !nearGlare(i + K)).map(Math.abs)) || 0;
+      const strength = score[best];
+      return { best, strength, typical, minStrength, ratio: typical > 0 ? strength / typical : (strength > 0 ? 99 : 0) };
+    };
+    const gP = pick(gScore, 5), eP = pick(eScore, 8);
+    // Auto: use whichever method sees the clearer line (stronger relative to its own noise).
+    let P, used;
+    if (c.mode === 'edge') { P = eP; used = 'edge'; }
+    else if (c.mode === 'green') { P = gP; used = 'green'; }
+    else {
+      // Keep the method in use unless the other one is clearly better, so the
+      // reading does not flip between two different lines.
+      const ok = q => q.strength >= q.minStrength && q.strength > 3 * q.typical;
+      const cur = cam.used === 'edge' ? eP : gP, oth = cam.used === 'edge' ? gP : eP;
+      const swap = !cam.used || (ok(oth) && (!ok(cur) || oth.ratio > 1.5 * cur.ratio));
+      used = swap ? (cur === gP ? 'edge' : 'green') : (cam.used || 'green');
+      if (!cam.used) used = (ok(gP) && !ok(eP)) || (ok(gP) === ok(eP) && gP.ratio >= eP.ratio) ? 'green' : 'edge';
+      if (used !== cam.used) cam.hist = [];
+      cam.used = used;
+      P = used === 'edge' ? eP : gP;
+    }
+    const { best, strength, typical, minStrength } = P;
+    const glareShare = glare.filter(Boolean).length / rows;
+    const y = y0 + best;
+    const ml = c.mlA + (y - c.ay) * (c.mlB - c.mlA) / (c.by - c.ay);
+    cam.hist.push(ml); if (cam.hist.length > 9) cam.hist.shift();
+    const sorted = [...cam.hist].sort((a, b) => a - b);
+    const spread = sorted.at(-1) - sorted[0];
+    cam.level = sorted[sorted.length >> 1];
+    cam.lineY = c.ay + (cam.level - c.mlA) * (c.by - c.ay) / (c.mlB - c.mlA);
+    // Confidence: a clear transition, well above the strip's typical change, that holds still.
+    cam.conf = !frozen && strength >= minStrength && strength > 3 * typical && spread < 20 ? 1 : 0;
+    cam.diag = { strength, ratio: P.ratio, spread, minStrength, used, glareShare, greenSeen: gP.strength, frozen };
+    // Trace drawn beside the strip: greenness, or brightness when finding edges.
+    cam.profile = { y0, green: used === 'green' ? green : rgb.map(v => (v[0] + v[1] + v[2]) / 3) };
+    cam.t = Date.now();
+    cam.strip = { x0, y0, y1 };
+    // Hand the reading to anything else on the page (e.g. a pump controller).
+    window.dispatchEvent(new CustomEvent('beakerlevel', { detail: { ml: cam.level, trusted: window.levelTrusted(), t: cam.t } }));
+  }
+  camDraw(); camShow();
+}
+
+function camDraw() {
+  const v = cEl('camVideo'), cv = cEl('camOverlay');
+  const r = cv.getBoundingClientRect();
+  cv.width = r.width; cv.height = r.height;
+  const g = cv.getContext('2d');
+  g.clearRect(0, 0, cv.width, cv.height);
+  if (!v.videoWidth) return;
+  const s = Math.min(r.width / v.videoWidth, r.height / v.videoHeight);
+  const ox = (r.width - v.videoWidth * s) / 2, oy = (r.height - v.videoHeight * s) / 2;
+  const X = x => ox + x * s, Y = y => oy + y * s;
+  const c = cam.cfg;
+  g.font = '12px system-ui'; g.lineWidth = 2;
+  const mark = (y, txt) => { g.strokeStyle = '#ffd24a'; g.setLineDash([5, 4]); g.beginPath(); g.moveTo(X(c.ax + c.shift) - 40, Y(y)); g.lineTo(X(c.ax + c.shift) + 40, Y(y)); g.stroke(); g.setLineDash([]); g.fillStyle = '#ffd24a'; g.fillText(txt, X(c.ax + c.shift) + 44, Y(y) + 4); };
+  if (Number.isFinite(c.ay)) mark(c.ay, `A ${c.mlA} mL`);
+  if (Number.isFinite(c.by) && Number.isFinite(c.ax)) mark(c.by, `B ${c.mlB} mL`);
+  if (cam.strip && calibrated()) {
+    g.strokeStyle = 'rgba(74,155,214,.9)'; g.strokeRect(X(cam.strip.x0), Y(cam.strip.y0), c.width * s, (cam.strip.y1 - cam.strip.y0) * s);
+    if (cam.profile?.green) {
+      // Greenness down the strip, drawn to the right of it (further right = greener).
+      const gx = X(cam.strip.x0) + c.width * s + 8, pg = cam.profile.green;
+      const fin = pg.filter(Number.isFinite), lo = Math.min(...fin), hi = Math.max(...fin), w = 50;
+      g.strokeStyle = cam.diag?.used === 'edge' ? 'rgba(220,220,220,.9)' : 'rgba(61,187,114,.9)'; g.lineWidth = 1.5; g.beginPath();
+      let pen = false;
+      pg.forEach((v, i) => {
+        const py = Y(cam.profile.y0 + i);
+        if (!Number.isFinite(v)) { pen = false; g.fillStyle = 'rgba(255,210,74,.35)'; g.fillRect(gx - c.width * s - 8, py, c.width * s, Math.max(1, s)); return; }
+        const px = gx + (hi > lo ? (v - lo) / (hi - lo) : 0) * w;
+        pen ? g.lineTo(px, py) : g.moveTo(px, py); pen = true;
+      });
+      g.stroke(); g.lineWidth = 2;
+    }
+    if (Number.isFinite(cam.lineY)) {
+      g.strokeStyle = cam.conf ? '#3dbb72' : '#e0473f'; g.lineWidth = 3;
+      g.beginPath(); g.moveTo(X(cam.strip.x0) - 30, Y(cam.lineY)); g.lineTo(X(cam.strip.x0) + c.width * s + 30, Y(cam.lineY)); g.stroke();
+      g.fillStyle = g.strokeStyle; g.fillText(`${Math.round(cam.level)} mL`, X(cam.strip.x0) - 30, Y(cam.lineY) - 6);
+    }
+  }
+}
+
+function camShow() {
+  const big = cEl('camLevel'), sub = cEl('camSub');
+  if (!cam.stream) { big.textContent = '–'; sub.textContent = 'Not measuring.'; return; }
+  if (!calibrated()) { big.textContent = '–'; sub.textContent = 'Click mark A and mark B to calibrate.'; return; }
+  if (!Number.isFinite(cam.level)) { big.textContent = '–'; sub.textContent = 'Looking for the water line…'; return; }
+  big.innerHTML = `${Math.round(cam.level)}<small>mL</small>`;
+  const d = cam.diag || {};
+  const how = d.used === 'edge' ? 'brightness edge' : 'green colour';
+  const nums = ` Using ${how}. Edge ${Math.round(d.strength || 0)} (needs ${d.minStrength || 5}+), contrast ×${(d.ratio || 0).toFixed(1)} (needs 3+), jitter ${Math.round(d.spread || 0)} mL (needs under 20).`;
+  sub.textContent = (cam.conf ? 'Water line found and steady.' : 'Water line unclear: the reading is not being used.') + nums;
+  if (cam.picking) return;
+  if (d.frozen) camMsg('The camera picture has frozen: unlock the phone, check the webcam app is running, and keep this window open (not minimised).', 'bad');
+  else if (!cam.conf) {
+    let why = 'Unclear line: ';
+    if ((d.glareShare || 0) > 0.15) why += 'LED glare covers part of the strip (shaded yellow); move the strip or angle the light away. ';
+    if (cam.cfg.mode === 'green' && (d.greenSeen || 0) < 5) why += 'No green is visible (the dye is too faint for the camera); choose “Auto” or “Any edge”. ';
+    why += 'Keep the strip off the printed scale, put the phone level with the water line, and stand a striped card behind the beaker.';
+    camMsg(why, 'bad');
+  }
+  else camMsg('Water line found: this reading is trusted.', 'ok');
+}
+window.addEventListener('beforeunload', camStop);
+</script>
+</body>
+</html>
