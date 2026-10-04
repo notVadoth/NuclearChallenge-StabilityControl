@@ -19,6 +19,7 @@ Google docs view link: https://docs.google.com/document/d/1-GoW5N-BXc-cunrPMzWba
 | `dye_concentration_controller/` | The repo's controller sketch with a 10-second-per-pump test mode added, plus a local copy of the PID library (Brett Beauregard, MIT licence) so it compiles without installing it. |
 | `Docs/Nuclear Innovation Challenge.pptx` | Group 9's presentation: challenge problem, background, the control rod simulator, experiment and observations, setbacks, safety and regulations, citations and AI disclosure. |
 | `Docs/calibration-2026-10-03.svg` | Graph of the 3 Oct 2026 calibration: absorbance of the five standards against concentration, with the fitted line. |
+| `Media/` | Photos of the rig, the bench setup, the control app in use and the team. |
 
 ## Hardware
 
@@ -86,5 +87,12 @@ Runs vary by about ±10 mL, so volumes in the app are estimates.
 - App: estimated tank level guards (stops inflow near 450 mL, waste at 100 mL); automatic control stops on sensor fault, Arduino safety stop, disconnect or Stop all.
 - The pump app does not read a level sensor yet (the beaker level camera runs separately): always watch the tank.
 
-<img width="75" height="100" alt="image" src="https://github.com/user-attachments/assets/74e986dc-8713-442b-b2a2-b0331ca3541e" />
+## Photos from the build
+
+| | |
+| --- | --- |
+| ![The control tank ("Reactor") inside the cardboard light box, with the colour sensor clamped above it and the Arduino beside it](Media/rig-in-light-box.jpg) | ![Group 9 with the rig and the dye standards at the Nuclear Innovation Challenge](Media/team.jpg) |
+| The control tank ("Reactor") in the closed light box, with the colour sensor clamped over it and the Arduino beside it. | Group 9 with the rig and the dye standards. |
+| ![Bench setup: dye, clear and waste beakers with pump tubing, the colour sensor, Arduino, motor drivers on a breadboard and the 9 V battery, with the numbered calibration standards behind](Media/bench-setup.jpg) | ![The control app during a test: automatic control log, the beaker level camera reading 366 mL, and the pump panels](Media/control-app-running.jpg) |
+| Bench setup before the box: dye, clear and waste beakers with pump tubing, the sensor, Arduino, DRV8833 drivers and 9 V battery, with the numbered calibration standards behind. | The control app during a test, with the beaker level camera reading the tank. This is the development version with the camera built into the app, which is not in this repository yet. |
 
