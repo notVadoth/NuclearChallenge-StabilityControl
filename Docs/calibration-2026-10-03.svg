@@ -1,0 +1,111 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 470" width="720" height="470" role="img" aria-labelledby="t d">
+  <title id="t">Calibration curve, 3 Oct 2026</title>
+  <desc id="d">Absorbance A against dye concentration C for 1 to 5 drops of green food dye in 350 mL. Fitted line A = 390.29 C + 0.3656, R squared 0.956. Points: 1 drop 0.4122, 2 drops 0.4674, 3 drops 0.5656, 4 drops 0.5886 (estimated, reading was faulty), 5 drops 0.6304.</desc>
+  <style>
+    .bg { fill: #fcfcfb; }
+    .ink { fill: #0b0b0b; }
+    .ink2 { fill: #52514e; }
+    .grid { stroke: #e4e3df; stroke-width: 1; }
+    .axis { stroke: #8c8b86; stroke-width: 1; }
+    .fit { stroke: #2a78d6; stroke-width: 2; fill: none; }
+    .pt { fill: #2a78d6; stroke: #fcfcfb; stroke-width: 2; }
+    .est { fill: #fcfcfb; stroke: #2a78d6; stroke-width: 2; }
+    text { font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; font-size: 13px; }
+    .title { font-size: 17px; font-weight: 600; }
+    .small { font-size: 12px; }
+    @media (prefers-color-scheme: dark) {
+      .bg { fill: #1a1a19; }
+      .ink { fill: #ffffff; }
+      .ink2 { fill: #c3c2b7; }
+      .grid { stroke: #383835; }
+      .axis { stroke: #77766f; }
+      .fit { stroke: #3987e5; }
+      .pt { fill: #3987e5; stroke: #1a1a19; }
+      .est { fill: #1a1a19; stroke: #3987e5; }
+    }
+  </style>
+
+  <rect class="bg" x="0" y="0" width="720" height="470" rx="8"/>
+
+  <text class="ink title" x="70" y="28">Calibration curve, 3 Oct 2026</text>
+  <text class="ink2" x="70" y="48">A = 390.29 C + 0.3656 · R² = 0.956 · f0 = 6166.46 Hz · red filter, 100 % scaling, room light</text>
+
+  <!-- horizontal grid + y labels (A from 0.35 to 0.70) -->
+  <g class="grid">
+    <line x1="70" x2="690" y1="325.71" y2="325.71"/>
+    <line x1="70" x2="690" y1="281.43" y2="281.43"/>
+    <line x1="70" x2="690" y1="237.14" y2="237.14"/>
+    <line x1="70" x2="690" y1="192.86" y2="192.86"/>
+    <line x1="70" x2="690" y1="148.57" y2="148.57"/>
+    <line x1="70" x2="690" y1="104.29" y2="104.29"/>
+    <line x1="70" x2="690" y1="60" y2="60"/>
+  </g>
+  <g class="ink2 small" text-anchor="end">
+    <text x="62" y="374">0.35</text>
+    <text x="62" y="329.71">0.40</text>
+    <text x="62" y="285.43">0.45</text>
+    <text x="62" y="241.14">0.50</text>
+    <text x="62" y="196.86">0.55</text>
+    <text x="62" y="152.57">0.60</text>
+    <text x="62" y="108.29">0.65</text>
+    <text x="62" y="64">0.70</text>
+  </g>
+
+  <!-- x axis: C x 10^-4 from 0 to 8 -->
+  <line class="axis" x1="70" x2="690" y1="370" y2="370"/>
+  <g class="axis">
+    <line x1="70" x2="70" y1="370" y2="375"/>
+    <line x1="147.5" x2="147.5" y1="370" y2="375"/>
+    <line x1="225" x2="225" y1="370" y2="375"/>
+    <line x1="302.5" x2="302.5" y1="370" y2="375"/>
+    <line x1="380" x2="380" y1="370" y2="375"/>
+    <line x1="457.5" x2="457.5" y1="370" y2="375"/>
+    <line x1="535" x2="535" y1="370" y2="375"/>
+    <line x1="612.5" x2="612.5" y1="370" y2="375"/>
+    <line x1="690" x2="690" y1="370" y2="375"/>
+  </g>
+  <g class="ink2 small" text-anchor="middle">
+    <text x="70" y="390">0</text>
+    <text x="147.5" y="390">1</text>
+    <text x="225" y="390">2</text>
+    <text x="302.5" y="390">3</text>
+    <text x="380" y="390">4</text>
+    <text x="457.5" y="390">5</text>
+    <text x="535" y="390">6</text>
+    <text x="612.5" y="390">7</text>
+    <text x="690" y="390">8</text>
+  </g>
+  <!-- drops under each standard -->
+  <g class="ink2 small" text-anchor="middle">
+    <text x="180.71" y="408">1 drop</text>
+    <text x="291.43" y="408">2</text>
+    <text x="402.14" y="408">3</text>
+    <text x="512.86" y="408">4</text>
+    <text x="623.57" y="408">5 drops</text>
+  </g>
+  <text class="ink" x="380" y="434" text-anchor="middle">C, mL food dye per mL total (×10⁻⁴), drops × 0.05 mL / 350 mL</text>
+  <text class="ink" transform="translate(20 215) rotate(-90)" text-anchor="middle">Absorbance A = −log10(f / f0)</text>
+
+  <!-- fitted line over the valid range, 1 to 5 drops -->
+  <line class="fit" x1="180.71" y1="306.07" x2="623.57" y2="108.53"/>
+
+  <!-- standards -->
+  <circle class="pt" cx="180.71" cy="314.91" r="6"/>
+  <circle class="pt" cx="291.43" cy="266.02" r="6"/>
+  <circle class="pt" cx="402.14" cy="179.04" r="6"/>
+  <circle class="est" cx="512.86" cy="158.67" r="5"/>
+  <circle class="pt" cx="623.57" cy="121.65" r="6"/>
+
+  <!-- direct label for the estimated point -->
+  <text class="ink2 small" x="500" y="140" text-anchor="end">4 drops: estimated (reading was faulty)</text>
+
+  <!-- legend -->
+  <g transform="translate(70 452)">
+    <circle class="pt" cx="6" cy="-4" r="6"/>
+    <text class="ink2 small" x="18" y="0">measured standard</text>
+    <circle class="est" cx="150" cy="-4" r="5"/>
+    <text class="ink2 small" x="162" y="0">estimated standard</text>
+    <line class="fit" x1="290" x2="314" y1="-4" y2="-4"/>
+    <text class="ink2 small" x="322" y="0">least-squares fit, valid for 1–5 drops in 350 mL</text>
+  </g>
+</svg>
