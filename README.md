@@ -1,4 +1,4 @@
-# Nuclear Challenge: Reactor Stability Control (Dye Analogue)
+# Nuclear Innovation Challenge: Reactor Stability Control (Dye Analogue)
 
 A bench-scale analogue of reactor control for the 2026 Nuclear Innovation Challenge (Controls and Instrumentation track). Green food dye stands in for boron: adding dye "lowers the control rods", diluting with clear water "raises" them. A colour sensor reads the dye concentration, and pumps hold it at a target. The long-term goal is a holistic system that predicts unstable conditions and recommends actions before they happen.
 
