@@ -70,14 +70,5 @@ Runs vary by about ±10 mL, so volumes in the app are estimates.
 - App: estimated tank level guards (stops inflow near 450 mL, waste at 100 mL); automatic control stops on sensor fault, Arduino safety stop, disconnect or Stop all.
 - There is no level sensor yet: always watch the tank.
 
-## Roadmap
-
-1. Show and enter concentration in mL dye / mL total (app currently displays mL per litre, i.e. x1000).
-2. iPhone camera (as a webcam) to measure tank and reservoir levels: real level control, refill and empty-waste requests, self-correcting flow rates.
-3. Data logging, state estimator and a mass-balance model of the tank.
-4. Separate safety supervisor (NORMAL / WARNING / LIMITING / SCRAM) and fault detection.
-5. Forward prediction (time to limit) and an advisor that recommends actions.
-6. Couple the measured concentration to the base repo's reactor simulator so the tank drives simulated reactor power under grid-demand scenarios.
-
 <img width="75" height="100" alt="image" src="https://github.com/user-attachments/assets/74e986dc-8713-442b-b2a2-b0331ca3541e" />
 
