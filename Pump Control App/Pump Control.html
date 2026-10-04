@@ -1,0 +1,1526 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pump Control</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Semi+Condensed:wght@500;600;700&display=swap">
+<style>
+:root {
+  --bg: #e6eaed;
+  --panel: #f6f8f9;
+  --ink: #1c2630;
+  --ink-soft: #5b6873;
+  --rule: #c9d1d7;
+  --dye: #2f9e5b;
+  --clear: #2e7fb8;
+  --waste: #8a6d3b;
+  --stop: #c8312b;
+  --ok: #2f9e5b;
+  --warn: #c98a12;
+  --font: "Barlow", system-ui, "Segoe UI", sans-serif;
+  --font-cond: "Barlow Semi Condensed", "Barlow", system-ui, "Segoe UI", sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #161c21;
+    --panel: #1f272e;
+    --ink: #e7ecef;
+    --ink-soft: #9aa7b1;
+    --rule: #33404a;
+    --dye: #3dbb72;
+    --clear: #4a9bd6;
+    --waste: #b8925a;
+    --stop: #e0473f;
+  }
+  .pump .toggle { color: #10161b; }
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font: 16px/1.45 var(--font);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+button, input { font: inherit; color: inherit; }
+button { cursor: pointer; }
+button:disabled { cursor: not-allowed; opacity: .45; }
+:focus-visible { outline: 3px solid var(--clear); outline-offset: 2px; }
+
+/* Header / connection */
+header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding: 18px 28px;
+  border-bottom: 1px solid var(--rule);
+  background: var(--panel);
+}
+header h1 {
+  font: 700 26px/1 var(--font-cond);
+  margin: 0;
+  letter-spacing: .01em;
+}
+header .rig { color: var(--ink-soft); font-size: 15px; margin-right: auto; }
+.link {
+  display: flex; align-items: center; gap: 10px;
+  font-weight: 600;
+}
+.lamp {
+  width: 14px; height: 14px; border-radius: 50%;
+  background: var(--rule);
+  box-shadow: inset 0 0 0 2px rgba(0,0,0,.15);
+}
+.link[data-state="on"] .lamp { background: var(--ok); }
+.link[data-state="wait"] .lamp { background: var(--warn); }
+.btn {
+  border: 1px solid var(--ink);
+  background: transparent;
+  border-radius: 6px;
+  padding: 9px 18px;
+  font-weight: 600;
+}
+.btn.primary { background: var(--ink); color: var(--panel); }
+.btn:not(:disabled):hover { filter: brightness(1.12); }
+
+/* Notice line */
+.notice {
+  margin: 0;
+  padding: 10px 28px;
+  font-size: 15px;
+  color: var(--ink-soft);
+}
+.notice.bad { color: var(--stop); font-weight: 600; }
+
+/* Pumps */
+main {
+  flex: 1;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 20px;
+  padding: 8px 28px 24px;
+  align-content: start;
+  align-items: start;
+}
+.pump {
+  --c: var(--dye);
+  background: var(--panel);
+  border: 1px solid var(--rule);
+  border-top: 6px solid var(--c);
+  border-radius: 8px;
+  padding: 18px 20px 20px;
+  display: grid;
+  grid-template-columns: 92px 1fr;
+  grid-template-rows: auto 1fr;
+  column-gap: 20px;
+  row-gap: 14px;
+}
+.pump.clear { --c: var(--clear); }
+.pump.waste { --c: var(--waste); }
+.pump header.ph {
+  all: unset;
+  grid-column: 1 / -1;
+  display: flex; align-items: baseline; gap: 10px;
+}
+.pump h2 { font: 700 28px/1 var(--font-cond); margin: 0; }
+.pump .role { color: var(--ink-soft); font-size: 15px; }
+
+/* The tank gauge: the one bold element */
+.gauge {
+  position: relative;
+  height: 230px;
+  border: 2px solid var(--ink);
+  border-top: 0;
+  border-radius: 0 0 14px 14px;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--c) 6%, transparent);
+}
+.gauge .fill {
+  position: absolute; left: 0; right: 0; bottom: 0;
+  height: 0%;
+  background: var(--c);
+  transition: height .35s ease;
+}
+.pump[data-running="true"] .gauge .fill {
+  background:
+    repeating-linear-gradient(-45deg, transparent 0 10px, rgba(255,255,255,.18) 10px 20px),
+    var(--c);
+  background-size: 28px 28px, auto;
+  animation: flow 1s linear infinite;
+}
+@keyframes flow { to { background-position: 0 28px, 0 0; } }
+.gauge .pct {
+  position: absolute; inset: auto 0 10px 0;
+  text-align: center;
+  font: 700 22px/1 var(--font-cond);
+  color: var(--ink);
+  mix-blend-mode: normal;
+}
+.pump[data-running="true"] .gauge .pct { color: #fff; }
+
+.controls { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.state {
+  font: 600 20px/1.2 var(--font-cond);
+}
+.state small { display: block; font: 400 15px/1.3 var(--font); color: var(--ink-soft); }
+.field label { display: flex; justify-content: space-between; font-size: 15px; color: var(--ink-soft); }
+.field output { color: var(--ink); font-weight: 600; }
+input[type="range"] { width: 100%; accent-color: var(--c); }
+.toggle {
+  border: 0;
+  border-radius: 6px;
+  padding: 12px;
+  font-weight: 700;
+  font-size: 17px;
+  background: var(--c);
+  color: #fff;
+}
+.pump[data-running="true"] .toggle { background: var(--ink); color: var(--panel); }
+.timed { display: flex; gap: 8px; align-items: stretch; }
+.timed input {
+  width: 72px;
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  background: var(--bg);
+  padding: 8px;
+  text-align: right;
+}
+.timed .btn { flex: 1; padding: 8px 10px; }
+
+/* Bottom bar */
+.bar {
+  position: sticky; bottom: 0;
+  display: flex; gap: 16px; align-items: stretch; flex-wrap: wrap;
+  padding: 16px 28px;
+  background: var(--panel);
+  border-top: 1px solid var(--rule);
+}
+.stop {
+  flex: 1 1 320px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--stop);
+  color: #fff;
+  font: 700 26px/1 var(--font-cond);
+  padding: 18px;
+  letter-spacing: .02em;
+}
+.stop small { display: block; font: 500 14px/1.3 var(--font); opacity: .85; margin-top: 4px; letter-spacing: 0; }
+.bar .side { display: flex; flex-direction: column; gap: 8px; justify-content: center; }
+details.log { padding: 0 28px 20px; }
+details.log summary { cursor: pointer; color: var(--ink-soft); padding: 10px 0; }
+details.log pre {
+  margin: 0;
+  max-height: 220px;
+  overflow: auto;
+  background: var(--panel);
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  padding: 12px;
+  font: 13px/1.5 Consolas, "Cascadia Mono", monospace;
+  white-space: pre-wrap;
+}
+
+@media (max-width: 900px) {
+  main { grid-template-columns: 1fr; }
+  .gauge { height: 160px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pump[data-running="true"] .gauge .fill { animation: none; }
+  .gauge .fill { transition: none; }
+}
+
+.flow { font-size: 14px; color: var(--ink-soft); margin-top: 4px; }
+.tank { display: flex; flex-direction: column; justify-content: center; gap: 6px; min-width: 210px; }
+.tank .v { font: 700 26px/1 var(--font-cond); }
+.tank .v small { font: 500 14px/1 var(--font); color: var(--ink-soft); margin-left: 4px; }
+.tank .v.hi { color: var(--stop); }
+.tank .row { display: flex; gap: 6px; align-items: center; font-size: 14px; color: var(--ink-soft); }
+.tank input { width: 70px; border: 1px solid var(--rule); border-radius: 6px; background: var(--bg); padding: 5px 6px; color: var(--ink); text-align: right; }
+.tank .btn { padding: 5px 10px; }
+/* ---------------- Sensor panel ---------------- */
+.sensor {
+  margin: 4px 28px 16px;
+  background: var(--panel);
+  border: 1px solid var(--rule);
+  border-left: 6px solid var(--ink);
+  border-radius: 8px;
+  padding: 18px 22px;
+  display: grid;
+  grid-template-columns: minmax(220px, 1.1fr) minmax(260px, 2fr) minmax(200px, 1fr);
+  gap: 24px;
+  align-items: start;
+}
+.sensor h2 { font: 700 24px/1 var(--font-cond); margin: 0 0 10px; }
+.reading .big { font: 700 44px/1 var(--font-cond); letter-spacing: -.01em; }
+.reading .big small { font: 600 18px/1 var(--font-cond); color: var(--ink-soft); margin-left: 6px; }
+.reading .sub { color: var(--ink-soft); font-size: 15px; margin-top: 6px; }
+.reading .flag { margin-top: 8px; font-size: 14px; font-weight: 600; color: var(--warn); }
+.reading .flag.bad { color: var(--stop); }
+.sensor .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-top: 14px; }
+.sensor select, .cal select, .cal input[type=number] {
+  border: 1px solid var(--rule); border-radius: 6px; background: var(--bg);
+  padding: 7px 8px; font: inherit; color: inherit;
+}
+.trend { position: relative; }
+.trend .cap { font-size: 14px; color: var(--ink-soft); margin-bottom: 4px; }
+.trend svg { width: 100%; height: 190px; display: block; overflow: visible; }
+.trend .tip {
+  position: absolute; pointer-events: none; display: none;
+  background: var(--ink); color: var(--panel); font-size: 13px; padding: 4px 8px; border-radius: 4px;
+  white-space: nowrap; transform: translate(-50%, -120%);
+}
+.chans { display: grid; gap: 7px; font-size: 14px; }
+.chans .cap { color: var(--ink-soft); }
+.chan { display: grid; grid-template-columns: 52px 1fr 70px; align-items: center; gap: 8px; }
+.chan .cbar { height: 10px; border-radius: 0 4px 4px 0; background: var(--rule); position: relative; }
+.chan .cbar i { position: absolute; inset: 0 auto 0 0; border-radius: 0 4px 4px 0; background: var(--ink-soft); }
+.chan.sel .cbar i { background: var(--ink); }
+.chan.sel span:first-child { font-weight: 700; }
+.chan span:last-child { text-align: right; font-variant-numeric: tabular-nums; }
+
+/* ---------------- Calibration dialog ---------------- */
+dialog.cal {
+  width: min(920px, calc(100vw - 32px));
+  max-height: calc(100vh - 40px);
+  border: 1px solid var(--rule); border-radius: 10px;
+  background: var(--panel); color: var(--ink);
+  padding: 0;
+}
+dialog.cal::backdrop { background: rgba(10, 16, 20, .55); }
+.cal .head { display: flex; align-items: center; gap: 12px; padding: 18px 24px; border-bottom: 1px solid var(--rule); }
+.cal .head h2 { font: 700 26px/1 var(--font-cond); margin: 0; margin-right: auto; }
+.cal .body { padding: 8px 24px 24px; overflow: auto; max-height: calc(100vh - 140px); }
+.cal ol.steps { list-style: none; padding: 0; margin: 0; counter-reset: s; }
+.cal ol.steps > li { counter-increment: s; border-bottom: 1px solid var(--rule); padding: 18px 0 18px 46px; position: relative; }
+.cal ol.steps > li::before {
+  content: counter(s); position: absolute; left: 0; top: 16px;
+  width: 30px; height: 30px; border-radius: 50%; border: 2px solid var(--ink);
+  display: grid; place-items: center; font: 700 16px/1 var(--font-cond);
+}
+.cal ol.steps > li.done::before { background: var(--ok); border-color: var(--ok); color: #fff; content: "✓"; }
+.cal h3 { font: 700 20px/1.2 var(--font-cond); margin: 0 0 6px; }
+.cal p { margin: 4px 0 10px; max-width: 70ch; }
+.cal ul.check { margin: 6px 0 10px; padding-left: 20px; }
+.cal .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-top: 8px; }
+.cal .result { font-weight: 600; }
+.cal .warn { color: var(--warn); font-weight: 600; }
+.cal .bad { color: var(--stop); font-weight: 600; }
+.cal table { border-collapse: collapse; width: 100%; margin-top: 10px; font-variant-numeric: tabular-nums; font-size: 15px; }
+.cal th, .cal td { text-align: right; padding: 6px 8px; border-bottom: 1px solid var(--rule); }
+.cal th:first-child, .cal td:first-child { text-align: left; }
+.cal th { color: var(--ink-soft); font-weight: 600; }
+.cal td button { border: 0; background: none; color: var(--stop); padding: 2px 6px; }
+.cal tr.odd td { color: var(--stop); }
+.fitwrap { display: grid; grid-template-columns: minmax(260px, 1.3fr) minmax(220px, 1fr); gap: 20px; align-items: start; }
+.fitchart svg { width: 100%; height: 240px; display: block; overflow: visible; }
+.fitnums { display: grid; grid-template-columns: auto 1fr; gap: 4px 14px; font-variant-numeric: tabular-nums; }
+.fitnums dt { color: var(--ink-soft); }
+.fitnums dd { margin: 0; font-weight: 600; }
+.cal pre.code {
+  background: var(--bg); border: 1px solid var(--rule); border-radius: 6px; padding: 10px 12px;
+  font: 13px/1.5 Consolas, "Cascadia Mono", monospace; white-space: pre-wrap; margin: 8px 0 0;
+}
+@media (max-width: 900px) {
+  .sensor { grid-template-columns: 1fr; }
+  .fitwrap { grid-template-columns: 1fr; }
+}
+
+/* ---------------- Automatic concentration control ---------------- */
+.auto {
+  margin: 0 28px 16px;
+  background: var(--panel);
+  border: 1px solid var(--rule);
+  border-left: 6px solid var(--stop);
+  border-radius: 8px;
+  padding: 18px 22px;
+  display: grid;
+  grid-template-columns: minmax(260px, 1.2fr) minmax(260px, 1fr);
+  gap: 24px;
+}
+.auto h2 { font: 700 24px/1 var(--font-cond); margin: 0 0 4px; }
+.auto .lead { color: var(--ink-soft); font-size: 15px; margin: 0 0 12px; max-width: 60ch; }
+.auto .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px 16px; }
+.auto label { display: flex; flex-direction: column; gap: 4px; font-size: 14px; color: var(--ink-soft); }
+.auto label.wide { grid-column: 1 / -1; }
+.auto input[type=number] {
+  border: 1px solid var(--rule); border-radius: 6px; background: var(--bg);
+  padding: 7px 8px; font: inherit; color: var(--ink); width: 100%;
+}
+.auto .target input { font: 700 22px/1.1 var(--font-cond); }
+.auto .hint { font-size: 13px; color: var(--ink-soft); }
+.auto .hint.bad { color: var(--stop); font-weight: 600; }
+.auto .go { display: flex; gap: 10px; margin-top: 14px; flex-wrap: wrap; }
+.auto .go .btn { padding: 11px 22px; font-size: 17px; }
+.auto .status { font: 700 22px/1.2 var(--font-cond); margin-bottom: 8px; }
+.auto .status.ok { color: var(--ok); }
+.auto .status.bad { color: var(--stop); }
+.auto dl { display: grid; grid-template-columns: auto 1fr; gap: 5px 14px; margin: 0; font-variant-numeric: tabular-nums; }
+.auto dt { color: var(--ink-soft); }
+.auto dd { margin: 0; font-weight: 600; }
+.auto .steps { margin-top: 10px; max-height: 150px; overflow: auto; font-size: 13px; color: var(--ink-soft); border-top: 1px solid var(--rule); padding-top: 8px; }
+.auto .steps div { padding: 2px 0; }
+.legend { display: flex; gap: 14px; font-size: 12px; color: var(--ink-soft); margin-top: 2px; flex-wrap: wrap; }
+.legend i { display: inline-block; width: 14px; height: 4px; border-radius: 1px; margin-right: 5px; vertical-align: middle; }
+@media (max-width: 900px) { .auto { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Pump Control</h1>
+  <span class="rig">Dye rig on Arduino UNO R4 Minima</span>
+  <div class="link" id="link" data-state="off"><span class="lamp" aria-hidden="true"></span><span id="linkText">Not connected</span></div>
+  <button class="btn primary" id="connectBtn">Connect to Arduino</button>
+</header>
+
+<p class="notice" id="notice">Upload <b>pump_control_serial.ino</b> to the Arduino, plug it in, then click Connect to Arduino and pick its port.</p>
+
+
+<section class="sensor" id="sensor" aria-labelledby="sensorTitle">
+  <div class="reading">
+    <h2 id="sensorTitle">Dye concentration</h2>
+    <div class="big" id="sBig">–</div>
+    <div class="sub" id="sSub">Connect to the Arduino to read the colour sensor.</div>
+    <div class="flag" id="sFlag" hidden></div>
+    <div class="row">
+      <button class="btn primary" id="calOpen" disabled>Calibrate sensor</button>
+      <button class="btn" id="calPush" hidden>Send saved calibration</button>
+    </div>
+  </div>
+  <div class="trend">
+    <div class="cap" id="trendCap">Last 10 minutes</div>
+    <svg id="trend" role="img" aria-label="Sensor trend over the last 10 minutes"></svg>
+    <div class="tip" id="trendTip"></div>
+  </div>
+  <div class="chans" id="chans">
+    <div class="cap">Light through the tank (Hz). Lower means more absorbed.</div>
+    <div class="chan" data-k="r"><span>Red</span><div class="cbar"><i></i></div><span>–</span></div>
+    <div class="chan" data-k="g"><span>Green</span><div class="cbar"><i></i></div><span>–</span></div>
+    <div class="chan" data-k="b"><span>Blue</span><div class="cbar"><i></i></div><span>–</span></div>
+    <div class="chan" data-k="c"><span>Clear</span><div class="cbar"><i></i></div><span>–</span></div>
+    <div class="row" style="margin-top:6px">
+      <label>Filter <select id="selChan">
+        <option value="R">Red</option><option value="G">Green</option>
+        <option value="B">Blue</option><option value="C">Clear</option>
+      </select></label>
+      <label>Scale <select id="selScale">
+        <option value="100">100 %</option><option value="20">20 %</option><option value="2">2 %</option>
+      </select></label>
+    </div>
+  </div>
+</section>
+
+
+<section class="auto" id="auto" aria-labelledby="autoTitle">
+  <div>
+    <h2 id="autoTitle">Automatic concentration control</h2>
+    <p class="lead">Doses dye or clear water in short bursts at the speeds set on the pump panels, waits for the tank to mix, re-reads the sensor, and repeats until it matches the target.</p>
+    <div class="grid">
+      <label class="target">Target concentration (mL/L)
+        <input type="number" id="aTarget" min="0.01" step="0.005" value="0.40">
+        <span class="hint" id="aTargetHint"></span>
+      </label>
+      <label>Dye reservoir: drops of dye
+        <input type="number" id="aResDrops" min="1" step="1" value="8">
+      </label>
+      <label>Dye reservoir volume (mL)
+        <input type="number" id="aResVol" min="50" step="10" value="400">
+        <span class="hint" id="aResHint"></span>
+      </label>
+      <label>Close enough within (± mL/L)
+        <input type="number" id="aTol" min="0.005" step="0.005" value="0.015">
+      </label>
+      <label>Mixing wait after each burst (s)
+        <input type="number" id="aMix" min="5" max="120" step="1" value="20">
+      </label>
+      <label>Largest burst (mL)
+        <input type="number" id="aBurst" min="5" max="60" step="1" value="20">
+      </label>
+      <label>Flush after dye + clear added (mL)
+        <input type="number" id="aFlush" min="20" max="250" step="10" value="200">
+      </label>
+    </div>
+    <div class="go">
+      <button class="btn primary" id="aStart" disabled>Start control</button>
+      <button class="btn" id="aStop" disabled>Stop control</button>
+    </div>
+  </div>
+  <div>
+    <div class="status" id="aStatus">Idle</div>
+    <dl>
+      <dt>Measured</dt><dd id="aMeas">–</dd>
+      <dt>Target</dt><dd id="aTgt">–</dd>
+      <dt>Tank (estimated)</dt><dd id="aTank">–</dd>
+      <dt>Dye added</dt><dd id="aDye">0 mL</dd>
+      <dt>Clear added</dt><dd id="aClear">0 mL</dd>
+      <dt>Flushed</dt><dd id="aFlushed">0 mL</dd>
+      <dt>Added since last flush</dt><dd id="aSince">0 mL</dd>
+    </dl>
+    <div class="legend"><span><i style="background:var(--dye)"></i>Dye burst</span><span><i style="background:var(--clear)"></i>Clear burst</span><span><i style="background:var(--waste)"></i>Flush</span><span><i style="background:var(--stop)"></i>Target (dashed)</span></div>
+    <div class="steps" id="aSteps" aria-live="polite"></div>
+  </div>
+</section>
+
+<main id="pumps"></main>
+
+<details class="log">
+  <summary>Messages from the Arduino</summary>
+  <pre id="log" aria-live="polite"></pre>
+</details>
+
+<div class="bar">
+  <button class="stop" id="stopAll">Stop all pumps<small>Space or Esc</small></button>
+  <div class="tank" aria-live="polite">
+    <span style="font-size:14px;color:var(--ink-soft)">Control tank (estimated from flow)</span>
+    <div class="v" id="tankV">350<small>mL</small></div>
+    <div class="row"><label for="tankSet">Actual level</label><input type="number" id="tankSet" min="0" max="500" step="5" value="350"><button class="btn" id="tankBtn">Set</button></div>
+  </div>
+  <div class="side">
+    <button class="btn" id="testBtn">Run pump test (up to 10 s each)</button>
+    <span style="font-size:14px;color:var(--ink-soft)">Waste, then dye, then clear. Dye and clear stop at 450 mL; waste stops at 100 mL.</span>
+  </div>
+</div>
+
+
+<dialog class="cal" id="cal" aria-labelledby="calTitle">
+  <div class="head">
+    <h2 id="calTitle">Calibrate the colour sensor</h2>
+    <button class="btn" id="calClose">Close</button>
+  </div>
+  <div class="body">
+    <p>Each standard has a known concentration, C = drops × 0.05 mL / 350 mL. The sensor gives its absorbance, A = −log10(f / f<sub>0</sub>), with f<sub>0</sub> from clear water. The calibration curve is the straight line through A against C. Pumps were stopped when this opened.</p>
+    <ol class="steps">
+      <li id="st1">
+        <h3>Set up the rig</h3>
+        <ul class="check">
+          <li>Control tank on its mark with exactly <b>350 mL</b> for every sample.</li>
+          <li>Sensor taped to the tank wall, phone flashlight directly opposite at the same height.</li>
+          <li>Box closed, no shadows, nothing moved, lighting unchanged for the whole calibration.</li>
+          <li>Standards use drops of the <b>same dyed reservoir solution</b> the pump uses (1 drop = 0.05 mL), never raw dye.</li>
+        </ul>
+        <div class="row">
+          <label>Filter <select id="cChan">
+            <option value="R">Red (best for green dye)</option><option value="G">Green</option>
+            <option value="B">Blue</option><option value="C">Clear</option>
+          </select></label>
+          <label>Scale <select id="cScale">
+            <option value="100">100 % (matches the repo regulator)</option><option value="20">20 %</option><option value="2">2 %</option>
+          </select></label>
+          <label>Readings per sample <input type="number" id="cN" min="5" max="60" value="30" style="width:70px"></label>
+        </div>
+        <p style="font-size:14px;color:var(--ink-soft)">Pick the filter whose reading falls most as dye is added. Green dye absorbs red light, so red is the default.</p>
+      </li>
+      <li id="st2">
+        <h3>Measure clear water</h3>
+        <p>Fill the tank with 350 mL of clear water and close the box.</p>
+        <div class="row">
+          <button class="btn primary" id="cBlank">Measure clear water</button>
+          <span class="result" id="cBlankRes"></span>
+        </div>
+      </li>
+      <li id="st3">
+        <h3>Measure at least 5 dye standards (up to 10)</h3>
+        <p>For each standard, add a known number of drops of reservoir solution to 350 mL of water, stir, let it settle, then measure. Work from fewest drops to most.</p>
+        <div class="row">
+          <label>Drops <input type="number" id="cDrops" min="1" max="999" step="1" value="2" style="width:80px"></label>
+          <button class="btn primary" id="cStd" disabled>Measure this standard</button>
+          <span class="result" id="cStdRes"></span>
+        </div>
+        <table id="cTable" hidden>
+          <thead><tr><th>Drops</th><th>Conc. (mL/mL)</th><th>Light (Hz)</th><th>± (Hz)</th><th>Absorbance A</th><th></th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </li>
+      <li id="st4">
+        <h3>Check the fit and save</h3>
+        <div id="cFitEmpty"><p>Measure clear water and at least 5 standards to see the fit.</p></div>
+        <div id="cFit" hidden>
+          <div class="fitwrap">
+            <div class="fitchart"><svg id="fitSvg" role="img" aria-label="Calibration curve: absorbance against concentration with fitted line"></svg></div>
+            <div>
+              <dl class="fitnums">
+                <dt>f<sub>clear</sub></dt><dd id="fF0"></dd>
+                <dt>Curve</dt><dd id="fCurve"></dd>
+                <dt>β₀ / β₁</dt><dd id="fB0"></dd>
+                <dt>R²</dt><dd id="fR2"></dd>
+                <dt>Range</dt><dd id="fRange"></dd>
+              </dl>
+              <p class="warn" id="fWarn" hidden></p>
+              <div class="row">
+                <button class="btn primary" id="cSave">Save to Arduino</button>
+                <button class="btn" id="cDownload">Download calibration</button>
+              </div>
+              <p class="result" id="cSaveRes"></p>
+            </div>
+          </div>
+          <p style="margin-top:14px">Values for the repo's <b>ConcentrationRegulator.ino</b>:</p>
+          <pre class="code" id="cCode"></pre>
+          <p class="warn" id="cCodeWarn" hidden></p>
+        </div>
+      </li>
+      <li id="st5">
+        <h3>Measure the dye reservoir (optional)</h3>
+        <p>Put the dye reservoir where the control tank sits and measure it. The regulator needs this to know how strong the pumped solution is.</p>
+        <div class="row">
+          <button class="btn" id="cRes" disabled>Measure dye reservoir</button>
+          <span class="result" id="cResRes"></span>
+        </div>
+      </li>
+    </ol>
+  </div>
+</dialog>
+
+<template id="pumpTpl">
+  <section class="pump" data-running="false">
+    <header class="ph"><h2></h2><span class="role"></span></header>
+    <div class="gauge" aria-hidden="true"><div class="fill"></div><div class="pct" title="Flow in mL/s">0</div></div>
+    <div class="controls">
+      <div class="state">Off<small>Waiting for connection</small></div>
+      <div class="field">
+        <label>Speed <output>60 / 255</output></label>
+        <input type="range" min="56" max="80" step="2" value="60">
+        <div class="flow">–</div>
+      </div>
+      <button class="toggle">Turn on</button>
+      <div class="timed">
+        <input type="number" min="1" max="26" step="1" value="10" aria-label="Seconds">
+        <button class="btn runFor">Run for 10 s</button>
+      </div>
+    </div>
+  </section>
+</template>
+
+<script>
+const PUMPS = [
+  { id: 'D', name: 'Dye', role: 'Adds green dye (lowers the rods)', cls: 'dye' },
+  { id: 'C', name: 'Clear', role: 'Adds clear water (raises the rods)', cls: 'clear' },
+  { id: 'W', name: 'Waste', role: 'Drains the control tank', cls: 'waste' },
+];
+const BAUD = 115200;
+// Speeds allowed by the Arduino sketch: 0 (off) or 55-80 of 255.
+// The slider runs 56-80 in steps of 2 so both 60 (measured) and 80 are reachable.
+const SPEED_MAX = 80;
+// Measured flow at speed 60, mL/s (bench test, 3 Oct 2026). Other speeds are
+// estimated in proportion until more are measured. Runs vary by about ±10 mL.
+const FLOW60 = { D: 8.9, C: 7.95, W: 9.4 };
+const flowAt = (id, pwm) => FLOW60[id] * pwm / 60;
+// Same per-run limits as the sketch: inflow pumps move at most 95 mL per run,
+// waste at most 250 mL.
+const RUN_ML = { D: 95, C: 95, W: 250 };
+const capSecs = (id, pwm) => RUN_ML[id] / flowAt(id, pwm);
+const TANK_MAX = 450, TANK_STOP = 445, TANK_MIN = 100;
+let tankMl = 350, tankTs = null;
+
+let port = null, writer = null, reader = null, connected = false, gotReady = false;
+let pingTimer = null, testAbort = null, readDone = null;
+const ui = {};
+const $ = (s, r = document) => r.querySelector(s);
+const logEl = $('#log');
+
+function log(line) {
+  const t = new Date().toLocaleTimeString();
+  logEl.textContent += `${t}  ${line}\n`;
+  const lines = logEl.textContent.split('\n');
+  if (lines.length > 400) logEl.textContent = lines.slice(-400).join('\n');
+  logEl.scrollTop = logEl.scrollHeight;
+}
+function notice(text, bad = false) {
+  const n = $('#notice'); n.innerHTML = text; n.classList.toggle('bad', bad);
+}
+
+// Build the three pump panels
+for (const p of PUMPS) {
+  const el = $('#pumpTpl').content.firstElementChild.cloneNode(true);
+  el.classList.add(p.cls);
+  $('h2', el).textContent = p.name;
+  $('.role', el).textContent = p.role;
+  const r = {
+    el, slider: $('input[type=range]', el), out: $('output', el), toggle: $('.toggle', el),
+    secs: $('.timed input', el), runFor: $('.runFor', el), state: $('.state', el),
+    fill: $('.fill', el), pct: $('.pct', el), pwm: 0, msLeft: 0,
+  };
+  r.flow = $('.flow', el);
+  r.id = p.id;
+  r.slider.addEventListener('input', () => updateFlowText(r));
+  r.slider.addEventListener('change', () => {
+    // Adjust a running pump to the new speed.
+    if (r.pwm > 0) {
+      const v = +r.slider.value;
+      if (r.msLeft > 0) send(`RUN ${p.id} ${v} ${(r.msLeft / 1000).toFixed(1)}`);
+      else send(`SET ${p.id} ${v}`);
+    }
+  });
+  r.toggle.addEventListener('click', () => {
+    if (r.pwm > 0) { send(`SET ${p.id} 0`); return; }
+    const v = +r.slider.value;
+    if (!tankAllows(p.id, v, capSecs(p.id, v))) return;
+    send(`SET ${p.id} ${v}`);
+  });
+  r.secs.addEventListener('input', () => updateFlowText(r));
+  r.runFor.addEventListener('click', () => {
+    const v = +r.slider.value;
+    const s = Math.min(Math.floor(capSecs(p.id, v)), Math.max(1, +r.secs.value || 10));
+    if (!tankAllows(p.id, v, s)) return;
+    send(`RUN ${p.id} ${v} ${s}`);
+  });
+  ui[p.id] = r;
+  $('#pumps').appendChild(el);
+  updateFlowText(r);
+}
+
+function updateFlowText(r) {
+  const v = +r.slider.value, f = flowAt(r.id, v);
+  const cap = Math.floor(capSecs(r.id, v));
+  r.out.textContent = `${v} / 255`;
+  r.flow.textContent = v === 60 ? `≈ ${f.toFixed(2)} mL/s (measured at 60)` : `≈ ${f.toFixed(1)} mL/s (estimated from speed 60)`;
+  r.secs.max = cap;
+  if (+r.secs.value > cap) r.secs.value = cap;
+  const secs = +r.secs.value || 0;
+  r.runFor.textContent = `Run ${secs || '–'} s, ≈${Math.round(f * secs)} mL`;
+}
+
+// Would running this pump for `secs` take the tank outside its safe range?
+function tankAllows(id, pwm, secs) {
+  const dv = flowAt(id, pwm) * secs;
+  if (id !== 'W' && tankMl + dv > TANK_MAX) {
+    notice(`Not started: ${Math.round(dv)} mL more would take the tank to about ${Math.round(tankMl + dv)} mL (limit ${TANK_MAX}). Drain some with the waste pump first, or shorten the run.`, true);
+    return false;
+  }
+  if (id === 'W' && tankMl - dv < TANK_MIN) {
+    notice(`Not started: draining ${Math.round(dv)} mL would leave about ${Math.round(tankMl - dv)} mL (minimum ${TANK_MIN}). Shorten the run.`, true);
+    return false;
+  }
+  return true;
+}
+
+// Track the tank level from the pump states the Arduino reports.
+function updateTank() {
+  const now = performance.now();
+  if (tankTs !== null) {
+    const dt = Math.min(1, (now - tankTs) / 1000);
+    for (const id of ['D', 'C', 'W']) {
+      const r = ui[id];
+      if (r.pwm > 0) tankMl += (id === 'W' ? -1 : 1) * flowAt(id, r.pwm) * dt;
+    }
+  }
+  tankTs = now;
+  if (tankMl >= TANK_STOP && (ui.D.pwm > 0 || ui.C.pwm > 0)) {
+    if (ui.D.pwm > 0) send('SET D 0');
+    if (ui.C.pwm > 0) send('SET C 0');
+    notice(`Dye and clear stopped: the tank is estimated at ${Math.round(tankMl)} mL. Check the real level and set it below.`, true);
+  }
+  if (tankMl <= TANK_MIN && ui.W.pwm > 0) {
+    send('SET W 0');
+    notice(`Waste stopped: the tank is estimated at ${Math.round(tankMl)} mL. Check the real level and set it below.`, true);
+  }
+  const el = $('#tankV');
+  el.innerHTML = `${Math.round(tankMl)}<small>mL</small>`;
+  el.classList.toggle('hi', tankMl > TANK_MAX - 20);
+}
+$('#tankBtn').addEventListener('click', () => {
+  const v = +$('#tankSet').value;
+  if (v >= 0 && v <= 500) { tankMl = v; updateTank(); notice(`Tank level set to ${v} mL.`); }
+});
+
+function render() {
+  for (const p of PUMPS) {
+    const r = ui[p.id];
+    const on = r.pwm > 0;
+    r.el.dataset.running = on;
+    r.fill.style.height = `${Math.round(r.pwm / SPEED_MAX * 100)}%`;
+    r.pct.textContent = on ? `${flowAt(p.id, r.pwm).toFixed(1)}` : '0';
+    r.toggle.textContent = on ? 'Turn off' : 'Turn on';
+    let detail;
+    if (!connected) detail = 'Waiting for connection';
+    else if (!on) detail = 'Ready';
+    else if (r.msLeft > 0) detail = `${(r.msLeft / 1000).toFixed(1)} s left`;
+    else detail = `Running, stops by itself after ${Math.floor(capSecs(p.id, r.pwm))} s`;
+    r.state.innerHTML = `${on ? `Running at ${r.pwm}` : 'Off'}<small>${detail}</small>`;
+    for (const c of [r.toggle, r.runFor, r.slider, r.secs]) c.disabled = !connected || (window.isAutoRunning?.() ?? false);
+  }
+  $('#stopAll').disabled = !connected;
+  $('#testBtn').disabled = !connected || (window.isAutoRunning?.() ?? false);
+  $('#testBtn').textContent = testAbort ? 'Cancel pump test' : 'Run pump test (up to 10 s each)';
+  const link = $('#link');
+  link.dataset.state = connected ? (gotReady ? 'on' : 'wait') : 'off';
+  $('#linkText').textContent = connected ? (gotReady ? 'Connected' : 'Connecting…') : 'Not connected';
+  $('#connectBtn').textContent = connected ? 'Disconnect' : 'Connect to Arduino';
+  $('#connectBtn').classList.toggle('primary', !connected);
+  if (window.sensorRender && render.lastConn !== connected) { render.lastConn = connected; window.sensorRender(); }
+  window.autoRender?.();
+}
+
+async function send(line) {
+  if (!writer) return;
+  try {
+    await writer.write(new TextEncoder().encode(line + '\n'));
+    if (line !== 'PING') log(`> ${line}`);
+  } catch (e) {
+    log(`! write failed: ${e.message}`);
+  }
+}
+
+function handleLine(line) {
+  line = line.trim();
+  if (!line) return;
+  if (window.sensorLine && window.sensorLine(line)) return;
+  if (line.startsWith('STATE')) {
+    gotReady = true;
+    for (const m of line.matchAll(/([DCW])=(\d+),(\d+)/g)) {
+      const r = ui[m[1]];
+      r.pwm = +m[2]; r.msLeft = +m[3];
+    }
+    updateTank();
+    render();
+    return;
+  }
+  log(`< ${line}`);
+  if (line.startsWith('READY')) {
+    gotReady = true;
+    notice('Connected. If the app closes or the cable is pulled, the Arduino stops every pump within 3 seconds.');
+  } else if (line.startsWith('SAFETY')) {
+    window.autoStop?.('Stopped by an Arduino safety stop.');
+    notice(line.replace(/^SAFETY\s*/, 'Safety stop: '), true);
+  } else if (line.startsWith('ERR')) {
+    notice(line.replace(/^ERR\s*/, 'Arduino rejected a command: '), true);
+  }
+  render();
+}
+
+async function readLoop() {
+  const decoder = new TextDecoderStream();
+  const closed = port.readable.pipeTo(decoder.writable).catch(() => {});
+  reader = decoder.readable.getReader();
+  let buf = '';
+  try {
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buf += value;
+      let i;
+      while ((i = buf.indexOf('\n')) >= 0) {
+        handleLine(buf.slice(0, i));
+        buf = buf.slice(i + 1);
+      }
+    }
+  } catch (e) {
+    log(`! read stopped: ${e.message}`);
+  } finally {
+    reader.releaseLock();
+    await closed;
+  }
+}
+
+async function connect() {
+  if (!('serial' in navigator)) {
+    notice('This browser cannot talk to USB devices. Open this file in Google Chrome or Microsoft Edge.', true);
+    return;
+  }
+  try {
+    port = await navigator.serial.requestPort();
+    try {
+      await port.open({ baudRate: BAUD });
+    } catch (e) {
+      if (e.name !== 'InvalidStateError') throw e;
+      // This page still holds the port from an earlier connection: reset it.
+      try { await port.close(); } catch {}
+      await port.open({ baudRate: BAUD });
+    }
+  } catch (e) {
+    if (e.name === 'NotFoundError') { notice('No port picked. Click Connect to Arduino and choose the Arduino (usually a COM port).'); }
+    else if (e.name === 'InvalidStateError') notice('The port is stuck from an earlier connection. Reload this page (F5), then click Connect to Arduino again.', true);
+    else notice(`Could not open the port (${e.message}). Close the Arduino IDE Serial Monitor and any other program using the Arduino, then try again.`, true);
+    port = null;
+    return;
+  }
+  // UNO R4 boards only send serial data once the computer raises DTR.
+  try { await port.setSignals({ dataTerminalReady: true, requestToSend: true }); } catch {}
+  writer = port.writable.getWriter();
+  connected = true; gotReady = false;
+  notice('Port open. Waiting for the Arduino to reply…');
+  render();
+  readDone = readLoop().then(() => { if (connected) disconnect('The Arduino was unplugged or reset.'); });
+  pingTimer = setInterval(() => send('PING'), 1000);
+  send('STATUS');
+  setTimeout(() => {
+    if (connected && !gotReady) notice('No reply from the Arduino. Upload pump_control_serial.ino to it first: click Disconnect here, upload from the Arduino IDE, then connect again.', true);
+  }, 4000);
+}
+
+async function disconnect(reason) {
+  const wasConnected = connected;
+  window.autoStop?.('Stopped: the Arduino disconnected.');
+  stopTest();
+  if (writer) { try { await send('STOP'); } catch {} }
+  connected = false; gotReady = false;
+  clearInterval(pingTimer);
+  try { if (reader) await reader.cancel(); } catch {}
+  try { if (readDone) await Promise.race([readDone, new Promise(r => setTimeout(r, 1000))]); } catch {}
+  try { if (writer) { await writer.close().catch(() => {}); writer.releaseLock(); } } catch {}
+  try { if (port) await port.close(); } catch (e) { log(`! close: ${e.message}`); }
+  readDone = null;
+  port = writer = reader = null;
+  for (const p of PUMPS) { ui[p.id].pwm = 0; ui[p.id].msLeft = 0; }
+  if (wasConnected) notice(reason || 'Disconnected. The Arduino stopped all pumps.', !!reason);
+  render();
+}
+
+function stopAll() {
+  window.autoStop?.('Stopped with Stop all pumps. Pumps off.');
+  stopTest();
+  send('STOP');
+  notice('All pumps stopped.');
+}
+
+function stopTest() {
+  if (testAbort) { testAbort.abort(); testAbort = null; render(); }
+}
+const sleep = (ms, signal) => new Promise((res, rej) => {
+  const t = setTimeout(res, ms);
+  signal.addEventListener('abort', () => { clearTimeout(t); rej(new Error('cancelled')); });
+});
+async function pumpTest() {
+  if (testAbort) { stopAll(); return; }
+  testAbort = new AbortController();
+  const { signal } = testAbort;
+  render();
+  try {
+    for (const id of ['W', 'D', 'C']) {
+      const name = PUMPS.find(p => p.id === id).name;
+      const v = +ui[id].slider.value, secs = Math.min(10, Math.floor(capSecs(id, v)));
+      if (!tankAllows(id, v, secs)) throw new Error('tank');
+      notice(`Pump test: ${name} pump running for ${secs} s (≈ ${Math.round(flowAt(id, v) * secs)} mL).`);
+      await send(`RUN ${id} ${v} ${secs}`);
+      await sleep(secs * 1000 + 2000, signal); // run + 2 s pause
+    }
+    notice('Pump test finished. All pumps are off.');
+  } catch { /* cancelled */ }
+  testAbort = null;
+  render();
+}
+
+$('#connectBtn').addEventListener('click', () => connected ? disconnect() : connect());
+$('#stopAll').addEventListener('click', stopAll);
+$('#testBtn').addEventListener('click', pumpTest);
+document.addEventListener('keydown', e => {
+  if (!connected) return;
+  const typing = ['INPUT', 'TEXTAREA'].includes(e.target.tagName) && e.target.type !== 'range';
+  if (e.key === 'Escape' || (e.key === ' ' && !typing && e.target.tagName !== 'BUTTON')) {
+    e.preventDefault();
+    stopAll();
+  }
+});
+window.addEventListener('beforeunload', () => { if (connected) send('STOP'); });
+if ('serial' in navigator) {
+  navigator.serial.addEventListener('disconnect', e => { if (e.target === port) disconnect('The Arduino was unplugged. Its pumps stop when power is lost.'); });
+} else {
+  notice('This browser cannot talk to USB devices. Open this file in Google Chrome or Microsoft Edge.', true);
+  $('#connectBtn').disabled = true;
+}
+render();
+</script>
+
+<script>
+// ===================== Colour sensor + calibration =====================
+// Method from the repo: BeerLambertCalibrator.ino, SimpleFrequencyChecker.ino,
+// ConcentrationRegulator.ino and test_rgb.ino.
+const DROP_ML = 0.05, TANK_ML = 350;          // BeerLambertCalibrator: drops * 0.05 / 350
+const MIN_STD = 5, MAX_STD = 10;
+const CAL_KEY = 'dyeRigCalibration';
+const sensor = { last: null, history: [], arduinoCal: null, sampleWait: null };
+let cal = loadLocalCal() || null;            // last fit made in this browser
+let work = { f0: null, f0sd: null, stds: [], reservoir: null };  // calibration in progress
+
+function loadLocalCal() { try { return JSON.parse(localStorage.getItem(CAL_KEY)); } catch { return null; } }
+function saveLocalCal(c) { try { localStorage.setItem(CAL_KEY, JSON.stringify(c)); } catch {} }
+const num = v => (v === 'nan' || v === undefined) ? NaN : parseFloat(v);
+const kv = line => Object.fromEntries([...line.matchAll(/(\w+)=([^\s]+)/g)].map(m => [m[1], m[2]]));
+const chName = { R: 'red', G: 'green', B: 'blue', C: 'clear' };
+const fmtSig = (v, d = 4) => Number.isFinite(v) ? Number(v.toPrecision(d)).toString() : '–';
+
+// ---- incoming lines (called from the main handleLine) ----
+window.sensorLine = function (line) {
+  if (line.startsWith('SENS ')) {
+    const o = kv(line);
+    const s = { t: Date.now(), ch: o.ch, sc: +o.sc, r: num(o.r), g: num(o.g), b: num(o.b), c: num(o.c),
+                f: num(o.f), a: num(o.a), conc: num(o.conc) };
+    sensor.last = s;
+    sensor.history.push(s);
+    const cutoff = Date.now() - 10 * 60000;
+    while (sensor.history.length && sensor.history[0].t < cutoff) sensor.history.shift();
+    renderSensor();
+    return true;
+  }
+  if (line.startsWith('SAMPLE ')) {
+    const o = kv(line);
+    const r = { ch: o.ch, sc: +o.sc, n: +o.n, ok: +o.ok, mean: num(o.mean), sd: num(o.sd), min: num(o.min), max: num(o.max) };
+    log(`< ${line}`);
+    if (sensor.sampleWait) { sensor.sampleWait(r); sensor.sampleWait = null; }
+    return true;
+  }
+  if (line.startsWith('CAL ')) {
+    log(`< ${line}`);
+    if (line.trim() === 'CAL none') sensor.arduinoCal = null;
+    else {
+      const o = kv(line);
+      sensor.arduinoCal = { f0: num(o.f0), b0: num(o.b0), b1: num(o.b1), amin: num(o.amin), amax: num(o.amax), ch: o.ch, sc: +o.sc };
+      $('#selChan').value = o.ch; $('#selScale').value = o.sc;
+    }
+    renderSensor();
+    if (typeof autoHints === 'function') autoHints();
+    return true;
+  }
+  if (line.startsWith('READY')) setTimeout(() => send('CAL GET'), 300);
+  return false;
+};
+
+window.sensorRender = function () {
+  $('#calOpen').disabled = !connected;
+  $('#selChan').disabled = !connected;
+  $('#selScale').disabled = !connected;
+  if (!connected) { sensor.last = null; sensor.arduinoCal = null; }
+  renderSensor();
+};
+
+// ---- live panel ----
+function renderSensor() {
+  const s = sensor.last, ac = sensor.arduinoCal;
+  const big = $('#sBig'), sub = $('#sSub'), flag = $('#sFlag');
+  flag.hidden = true; flag.classList.remove('bad');
+  $('#calPush').hidden = !(connected && !ac && cal);
+  if (!connected || !s) {
+    big.textContent = '–';
+    sub.textContent = connected ? 'Waiting for sensor readings…' : 'Connect to the Arduino to read the colour sensor.';
+  } else if (!Number.isFinite(s.f)) {
+    big.textContent = 'No signal';
+    sub.textContent = `The ${chName[s.ch]} filter returned no pulses.`;
+    flag.hidden = false; flag.classList.add('bad');
+    flag.textContent = 'Sensor fault: check OUT → D2, 5V, GND, and OE → GND.';
+  } else if (Number.isFinite(s.conc)) {
+    big.innerHTML = `${(s.conc * 1000).toFixed(3)}<small>mL/L</small>`;
+    sub.textContent = `≈ ${(s.conc * TANK_ML / DROP_ML).toFixed(1)} drops in 350 mL · A = ${s.a.toFixed(4)} · ${fmtSig(s.f, 5)} Hz`;
+    if (ac && (s.a < ac.amin - 0.005 || s.a > ac.amax + 0.005)) {
+      flag.hidden = false;
+      flag.textContent = 'Outside the calibrated range: treat this value as an estimate.';
+    }
+  } else {
+    big.innerHTML = `${fmtSig(s.f, 5)}<small>Hz</small>`;
+    if (!ac) sub.textContent = `${chName[s.ch]} filter at ${s.sc} %. Not calibrated yet, so no concentration.`;
+    else {
+      sub.textContent = `${chName[s.ch]} filter at ${s.sc} %.`;
+      flag.hidden = false;
+      flag.textContent = `The saved calibration used the ${chName[ac.ch]} filter at ${ac.sc} %. Switch back to see concentration.`;
+    }
+  }
+  // channel bars
+  const vals = s ? ['r', 'g', 'b', 'c'].map(k => s[k]).filter(Number.isFinite) : [];
+  const top = Math.max(1, ...vals);
+  for (const row of document.querySelectorAll('.chan')) {
+    const k = row.dataset.k, v = s ? s[k] : NaN;
+    row.classList.toggle('sel', !!s && s.ch.toLowerCase() === k);
+    row.querySelector('i').style.width = Number.isFinite(v) ? `${(v / top) * 100}%` : '0';
+    row.lastElementChild.textContent = Number.isFinite(v) ? Math.round(v).toLocaleString() : '–';
+  }
+  drawTrend();
+}
+
+const TREND_MS = 10 * 60000;   // graph window: last 10 minutes
+function drawTrend() {
+  const svg = $('#trend');
+  const W = svg.clientWidth || 400, H = 190, pl = 54, pr = 8, pt = 8, pb = 34;
+  const useConc = !!sensor.last && Number.isFinite(sensor.last.conc);
+  // Show concentration once calibrated, otherwise the raw frequency of the chosen filter.
+  const h = sensor.history.filter(p => useConc ? Number.isFinite(p.conc)
+    : (Number.isFinite(p.f) && p.ch === sensor.last?.ch && p.sc === sensor.last?.sc));
+  const val = p => useConc ? p.conc * 1000 : p.f;
+  const target = useConc && window.autoTarget != null ? window.autoTarget : null;  // mL/L
+  $('#trendCap').textContent = useConc ? 'Concentration, last 10 minutes (mL/L)' : 'Sensor reading, last 10 minutes (Hz)';
+  svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+  if (h.length < 2) { svg.innerHTML = `<text x="${pl}" y="${H / 2}" fill="var(--ink-soft)" font-size="13">Readings will appear here.</text>`; return; }
+  const now = Date.now(), t0 = now - TREND_MS;
+  const vals = h.map(val).concat(target != null ? [target] : []);
+  let lo = Math.min(...vals), hi = Math.max(...vals);
+  if (hi - lo < 1e-9) { lo -= useConc ? 0.05 : 1; hi += useConc ? 0.05 : 1; }
+  const padv = (hi - lo) * 0.15; lo -= padv; hi += padv;
+  if (lo < 0) lo = 0;
+  const X = t => pl + (t - t0) / TREND_MS * (W - pl - pr);
+  const Y = v => pt + (1 - (v - lo) / (hi - lo)) * (H - pt - pb);
+  const ticks = [lo, (lo + hi) / 2, hi];
+  const fmt = v => useConc ? v.toFixed(3) : Math.round(v).toLocaleString();
+  const pts = h.map(p => `${X(p.t).toFixed(1)},${Y(val(p)).toFixed(1)}`).join(' ');
+  // Pump bursts as short coloured bars along the bottom (dye, clear, flush).
+  const evColor = { D: 'var(--dye)', C: 'var(--clear)', W: 'var(--waste)' };
+  const evRow = { D: 0, C: 1, W: 2 };
+  const events = (sensor.events || []).filter(e => e.t1 > t0);
+  const evY = k => H - pb + 6 + evRow[k] * 5;
+  svg.innerHTML =
+    ticks.map(v => `<line x1="${pl}" x2="${W - pr}" y1="${Y(v)}" y2="${Y(v)}" stroke="var(--rule)" stroke-width="1"/>
+      <text x="${pl - 6}" y="${Y(v) + 4}" text-anchor="end" font-size="12" fill="var(--ink-soft)">${fmt(v)}</text>`).join('') +
+    (target != null ? `<line x1="${pl}" x2="${W - pr}" y1="${Y(target)}" y2="${Y(target)}" stroke="var(--stop)" stroke-width="1.5" stroke-dasharray="6 4"/>
+      <text x="${pl + 6}" y="${Y(target) - 5}" font-size="12" fill="var(--ink)">target ${target.toFixed(3)}</text>` : '') +
+    events.map(e => `<rect x="${X(Math.max(e.t0, t0))}" y="${evY(e.k)}" width="${Math.max(2, X(e.t1) - X(Math.max(e.t0, t0)))}" height="4" rx="1" fill="${evColor[e.k]}"><title>${{ D: 'Dye', C: 'Clear', W: 'Flush' }[e.k]} ≈ ${Math.round(e.ml)} mL</title></rect>`).join('') +
+    `<text x="${pl}" y="${H - 2}" font-size="12" fill="var(--ink-soft)">−10 min</text>
+     <text x="${W - pr}" y="${H - 2}" text-anchor="end" font-size="12" fill="var(--ink-soft)">now</text>
+     <polyline points="${pts}" fill="none" stroke="var(--ink)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+     <circle cx="${X(h.at(-1).t)}" cy="${Y(val(h.at(-1)))}" r="4" fill="var(--ink)"/>
+     <line id="trendX" y1="${pt}" y2="${H - pb}" stroke="var(--ink-soft)" stroke-width="1" visibility="hidden"/>
+     <circle id="trendDot" r="5" fill="var(--ink)" stroke="var(--panel)" stroke-width="2" visibility="hidden"/>
+     <rect x="${pl}" y="0" width="${W - pl - pr}" height="${H - pb}" fill="transparent" id="trendHit"/>`;
+  const tip = $('#trendTip');
+  const hit = $('#trendHit');
+  hit.onmousemove = e => {
+    const r = svg.getBoundingClientRect();
+    const x = (e.clientX - r.left) * (W / r.width);
+    const t = t0 + (x - pl) / (W - pl - pr) * TREND_MS;
+    let best = h[0];
+    for (const p of h) if (Math.abs(p.t - t) < Math.abs(best.t - t)) best = p;
+    const bx = X(best.t), by = Y(val(best));
+    $('#trendX').setAttribute('x1', bx); $('#trendX').setAttribute('x2', bx); $('#trendX').setAttribute('visibility', 'visible');
+    $('#trendDot').setAttribute('cx', bx); $('#trendDot').setAttribute('cy', by); $('#trendDot').setAttribute('visibility', 'visible');
+    tip.style.display = 'block';
+    tip.style.left = `${bx * r.width / W}px`; tip.style.top = `${by * r.height / H + 22}px`;
+    tip.textContent = `${useConc ? `${fmt(val(best))} mL/L` : `${fmt(val(best))} Hz`} · ${Math.round((now - best.t) / 1000)} s ago`;
+  };
+  hit.onmouseleave = () => { tip.style.display = 'none'; $('#trendX')?.setAttribute('visibility', 'hidden'); $('#trendDot')?.setAttribute('visibility', 'hidden'); };
+}
+
+$('#selChan').addEventListener('change', e => send(`CHAN ${e.target.value}`));
+$('#selScale').addEventListener('change', e => send(`SCALE ${e.target.value}`));
+$('#calPush').addEventListener('click', () => pushCal(cal));
+
+// ---- sampling ----
+function sample(n) {
+  return new Promise((resolve, reject) => {
+    const t = setTimeout(() => { sensor.sampleWait = null; reject(new Error('No reply from the Arduino')); }, 20000);
+    sensor.sampleWait = r => { clearTimeout(t); resolve(r); };
+    send(`SAMPLE ${n}`);
+  });
+}
+async function measure(btn, out) {
+  const ch = $('#cChan').value, sc = $('#cScale').value, n = Math.min(60, Math.max(5, +$('#cN').value || 30));
+  btn.disabled = true; out.className = 'result'; out.textContent = 'Measuring…';
+  try {
+    await send(`CHAN ${ch}`); await send(`SCALE ${sc}`);
+    $('#selChan').value = ch; $('#selScale').value = sc;
+    await new Promise(r => setTimeout(r, 300));
+    const r = await sample(n);
+    if (!r.ok || !Number.isFinite(r.mean) || r.mean <= 0) throw new Error('No signal from the sensor: too dark, or a wiring fault. Check the flashlight and the OUT, OE, 5V and GND wires.');
+    if (r.ok < r.n) out.className = 'result warn';
+    return r;
+  } catch (e) {
+    out.className = 'result bad'; out.textContent = e.message; return null;
+  } finally { btn.disabled = false; updateSteps(); }
+}
+const spread = r => `${fmtSig(r.mean, 6)} Hz ± ${fmtSig(r.sd, 3)} (${r.ok}/${r.n} readings)`;
+const unsteady = r => r.sd / r.mean > 0.02;
+
+// ---- calibration dialog ----
+$('#calOpen').addEventListener('click', () => {
+  send('STOP');
+  $('#cChan').value = sensor.last?.ch || 'R';
+  $('#cScale').value = String(sensor.last?.sc || 100);
+  updateSteps();
+  $('#cal').showModal();
+});
+$('#calClose').addEventListener('click', () => $('#cal').close());
+for (const id of ['#cChan', '#cScale']) $(id).addEventListener('change', () => {
+  if (work.f0 !== null || work.stds.length) {
+    work = { f0: null, f0sd: null, stds: [], reservoir: null };
+    $('#cBlankRes').textContent = 'Filter or scale changed: measure clear water again.';
+    $('#cBlankRes').className = 'result warn';
+  }
+  updateSteps();
+});
+
+$('#cBlank').addEventListener('click', async () => {
+  const out = $('#cBlankRes');
+  const r = await measure($('#cBlank'), out);
+  if (!r) return;
+  work.f0 = r.mean; work.f0sd = r.sd; work.ch = r.ch; work.sc = r.sc;
+  for (const s of work.stds) s.a = -Math.log10(s.f / work.f0);
+  out.textContent = `f_clear = ${spread(r)}` + (unsteady(r) ? '. Reading is unsteady: check the light and box.' : '');
+  if (unsteady(r)) out.className = 'result warn';
+  updateSteps();
+});
+
+$('#cStd').addEventListener('click', async () => {
+  const drops = Math.round(+$('#cDrops').value);
+  const out = $('#cStdRes');
+  if (!(drops > 0)) { out.className = 'result bad'; out.textContent = 'Enter the number of drops (1 or more). Clear water is already measured.'; return; }
+  if (work.stds.length >= MAX_STD) { out.className = 'result bad'; out.textContent = `Up to ${MAX_STD} standards. Delete one to add another.`; return; }
+  const r = await measure($('#cStd'), out);
+  if (!r) return;
+  const s = { drops, conc: drops * DROP_ML / TANK_ML, f: r.mean, sd: r.sd, a: -Math.log10(r.mean / work.f0) };
+  work.stds.push(s);
+  work.stds.sort((x, y) => x.drops - y.drops);
+  out.textContent = `${drops} drops: ${spread(r)}`;
+  if (s.f >= work.f0) { out.className = 'result warn'; out.textContent += '. More light than clear water: re-check this standard.'; }
+  $('#cDrops').value = drops + 2;
+  updateSteps();
+});
+
+$('#cRes').addEventListener('click', async () => {
+  const out = $('#cResRes');
+  const r = await measure($('#cRes'), out);
+  if (!r) return;
+  const fit = currentFit();
+  const a = -Math.log10(r.mean / work.f0);
+  const c = fit.b0 + fit.b1 * a;
+  work.reservoir = { f: r.mean, sd: r.sd, a, conc: c };
+  out.textContent = `${spread(r)} · A = ${a.toFixed(4)} · ≈ ${(c * 1000).toFixed(3)} mL/L`;
+  if (a > fit.amax) { out.className = 'result warn'; out.textContent += '. Beyond the strongest standard, so this is extrapolated.'; }
+  updateSteps();
+});
+
+function currentFit() {
+  // Calibration curve: concentration of each standard is KNOWN, C = drops * 0.05 / 350;
+  // absorbance is MEASURED, A = -log10(f / f0). Fit A = slope * C + intercept,
+  // with the clear-water blank (C = 0, A = 0) included.
+  const s = work.stds;
+  if (work.f0 === null || s.length < 2) return null;
+  const pts = [{ c: 0, a: 0 }, ...s.map(p => ({ c: p.conc, a: p.a }))];
+  const n = pts.length;
+  let sx = 0, sy = 0, sxy = 0, sxx = 0;
+  for (const p of pts) { sx += p.c; sy += p.a; sxy += p.c * p.a; sxx += p.c * p.c; }
+  const den = n * sxx - sx * sx;
+  if (Math.abs(den) < 1e-18) return null;
+  const slope = (n * sxy - sx * sy) / den;
+  const intercept = sy / n - slope * sx / n;
+  const abar = sy / n;
+  let ssr = 0, sst = 0;
+  for (const p of pts) { ssr += (p.a - (slope * p.c + intercept)) ** 2; sst += (p.a - abar) ** 2; }
+  // Read an unknown the other way round: C = (A - intercept) / slope = b0 + b1 * A
+  return { slope, intercept, b1: 1 / slope, b0: -intercept / slope, r2: sst > 0 ? 1 - ssr / sst : NaN,
+           amin: 0, amax: Math.max(...s.map(p => p.a)), n: s.length };
+}
+
+function updateSteps() {
+  const haveBlank = work.f0 !== null, n = work.stds.length, fit = currentFit();
+  $('#st1').classList.toggle('done', haveBlank);
+  $('#st2').classList.toggle('done', haveBlank);
+  $('#st3').classList.toggle('done', n >= MIN_STD);
+  $('#cStd').disabled = !haveBlank || !connected;
+  $('#cBlank').disabled = !connected;
+  $('#cRes').disabled = !(n >= MIN_STD && fit) || !connected;
+  $('#st5').classList.toggle('done', !!work.reservoir);
+  // table
+  const tb = $('#cTable tbody');
+  $('#cTable').hidden = n === 0;
+  tb.innerHTML = '';
+  work.stds.forEach((p, i) => {
+    const prev = work.stds[i - 1];
+    const odd = (prev && p.a <= prev.a) || p.a <= 0;
+    const tr = document.createElement('tr');
+    if (odd) { tr.className = 'odd'; tr.title = 'Absorbance should rise with more drops. Re-measure this standard.'; }
+    tr.innerHTML = `<td>${p.drops}</td><td>${p.conc.toExponential(3)}</td><td>${fmtSig(p.f, 6)}</td><td>${fmtSig(p.sd, 3)}</td><td>${p.a.toFixed(4)}</td><td><button aria-label="Delete ${p.drops}-drop standard">Delete</button></td>`;
+    tr.querySelector('button').onclick = () => { work.stds.splice(i, 1); work.reservoir = null; updateSteps(); };
+    tb.appendChild(tr);
+  });
+  // fit
+  const ready = haveBlank && n >= MIN_STD && fit;
+  $('#cFit').hidden = !ready; $('#cFitEmpty').hidden = !!ready;
+  $('#st4').classList.toggle('done', !!(ready && work.saved));
+  if (!ready) return;
+  $('#fF0').textContent = `${fmtSig(work.f0, 6)} Hz (${chName[work.ch]}, ${work.sc} %)`;
+  $('#fCurve').textContent = `A = ${fit.slope.toFixed(2)} × C ${fit.intercept < 0 ? '−' : '+'} ${Math.abs(fit.intercept).toFixed(5)}`;
+  $('#fB0').textContent = `${fit.b0.toPrecision(4)} / ${fit.b1.toPrecision(6)}`;
+  $('#fR2').textContent = fit.r2.toFixed(4);
+  $('#fRange').textContent = `0–${(work.stds.at(-1).conc * 1000).toFixed(3)} mL/L (A 0–${fit.amax.toFixed(3)})`;
+  const warns = [];
+  if (fit.r2 < 0.98) warns.push('R² is below 0.98: re-measure the standards that sit off the line.');
+  if (work.stds.some((p, i) => i && p.a <= work.stds[i - 1].a)) warns.push('Absorbance does not rise steadily with drops (rows in red).');
+  if (fit.slope <= 0) warns.push('The slope is not positive: more dye should mean more absorbance. Check the filter choice.');
+  $('#fWarn').hidden = !warns.length; $('#fWarn').textContent = warns.join(' ');
+  $('#cCode').textContent =
+`// User input values.
+float clear_frequency = ${work.f0.toFixed(2)};
+float beta0 = ${fit.b0.toFixed(10)};
+float beta1 = ${fit.b1.toFixed(10)};
+
+// Measured pump flow at speed 60 (mL/s): dye 8.9, clear 7.95, waste 9.4.
+// The regulator assumes one pump_output for every pump and drives them at
+// PWM 170 and 85, outside the 55-80 limit. Run them all at 60 and use:
+float pump_output = 8.9; // mL/s, dye pump at speed 60` + (work.reservoir ? `\n// Dye reservoir frequency (enter when asked): ${work.reservoir.f.toFixed(2)}` : '');
+  const cw = [];
+  if (work.ch !== 'R') cw.push('ConcentrationRegulator.ino reads through the red filter, but this calibration used ' + chName[work.ch] + '. Change its filter pins (s2/s3) to match before using these values.');
+  if (work.sc !== 100) cw.push(`ConcentrationRegulator.ino reads at 100 % scaling, but this calibration used ${work.sc} %. Recalibrate at 100 % to use these values there.`);
+  $('#cCodeWarn').hidden = !cw.length; $('#cCodeWarn').textContent = cw.join(' ');
+  drawFit(fit);
+}
+
+function drawFit(fit) {
+  // Standard calibration curve: concentration (known) on x, absorbance (measured) on y.
+  const svg = $('#fitSvg');
+  const W = svg.clientWidth || 420, H = 240, pl = 52, pr = 12, pt = 10, pb = 36;
+  svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+  const pts = [{ x: 0, y: 0, blank: true }, ...work.stds.map(p => ({ x: p.conc * 1000, y: p.a, p }))];
+  const x0 = 0, x1 = Math.max(...pts.map(p => p.x)) * 1.1 || 1;
+  const y0 = Math.min(0, ...pts.map(p => p.y)), y1 = Math.max(...pts.map(p => p.y)) * 1.1 || 1;
+  const X = v => pl + (v - x0) / (x1 - x0) * (W - pl - pr);
+  const Y = v => pt + (1 - (v - y0) / (y1 - y0)) * (H - pt - pb);
+  const aOf = cmlL => (cmlL / 1000 - fit.b0) / fit.b1;   // fitted line, A as a function of C
+  const yt = [y0, (y0 + y1) / 2, y1], xt = [x0, (x0 + x1) / 2, x1];
+  svg.innerHTML =
+    yt.map(v => `<line x1="${pl}" x2="${W - pr}" y1="${Y(v)}" y2="${Y(v)}" stroke="var(--rule)"/>
+      <text x="${pl - 6}" y="${Y(v) + 4}" text-anchor="end" font-size="12" fill="var(--ink-soft)">${v.toFixed(2)}</text>`).join('') +
+    xt.map(v => `<text x="${X(v)}" y="${H - pb + 16}" text-anchor="middle" font-size="12" fill="var(--ink-soft)">${v.toFixed(2)}</text>`).join('') +
+    `<text x="${(pl + W - pr) / 2}" y="${H - 4}" text-anchor="middle" font-size="12" fill="var(--ink-soft)">Concentration (mL dye / L)</text>
+     <text x="12" y="${(pt + H - pb) / 2}" text-anchor="middle" font-size="12" fill="var(--ink-soft)" transform="rotate(-90 12 ${(pt + H - pb) / 2})">Absorbance A</text>
+     <line x1="${X(x0)}" y1="${Y(aOf(x0))}" x2="${X(x1)}" y2="${Y(aOf(x1))}" stroke="var(--ink-soft)" stroke-width="2" stroke-dasharray="6 4"/>` +
+    pts.map(q => q.blank
+      ? `<circle cx="${X(0)}" cy="${Y(0)}" r="5" fill="var(--panel)" stroke="var(--ink-soft)" stroke-width="2"><title>Clear water: A = 0</title></circle>`
+      : `<circle cx="${X(q.x)}" cy="${Y(q.y)}" r="6" fill="var(--dye)" stroke="var(--panel)" stroke-width="2"><title>${q.p.drops} drops: ${q.x.toFixed(3)} mL/L, A = ${q.y.toFixed(4)}</title></circle>`).join('');
+}
+
+function buildCal() {
+  const fit = currentFit();
+  return {
+    made: new Date().toISOString(), method: 'Calibration curve A = slope*C + intercept (C = drops*0.05/350 known, A = -log10(f/f0) measured, blank included); read as C = beta0 + beta1*A',
+    slope: fit.slope, intercept: fit.intercept,
+    channel: work.ch, scale: work.sc, f_clear: work.f0, f_clear_sd: work.f0sd,
+    beta0: fit.b0, beta1: fit.b1, r2: fit.r2, a_min: fit.amin, a_max: fit.amax,
+    drop_ml: DROP_ML, tank_ml: TANK_ML, standards: work.stds, reservoir: work.reservoir,
+  };
+}
+async function pushCal(c) {
+  await send(`CAL SET ${c.f_clear.toFixed(3)} ${c.beta0.toExponential(8)} ${c.beta1.toExponential(8)} ${c.a_min.toFixed(6)} ${c.a_max.toFixed(6)} ${c.channel} ${c.scale}`);
+}
+$('#cSave').addEventListener('click', async () => {
+  const c = buildCal();
+  cal = c; saveLocalCal(c);
+  await pushCal(c);
+  work.saved = true;
+  $('#cSaveRes').textContent = 'Saved on the Arduino (kept after power-off) and in this browser. Live readings now show concentration.';
+  updateSteps();
+});
+$('#cDownload').addEventListener('click', () => {
+  const c = buildCal();
+  const csv = ['drops,concentration_ml_per_ml,frequency_hz,sd_hz,absorbance',
+    ...c.standards.map(p => [p.drops, p.conc, p.f, p.sd, p.a].join(','))].join('\n');
+  const blob = new Blob([JSON.stringify({ ...c, standards_csv: csv }, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `dye-calibration-${new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-')}.json`;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+});
+window.addEventListener('resize', () => { drawTrend(); if (!$('#cFit').hidden) { const f = currentFit(); if (f) drawFit(f); } });
+sensorRender();
+</script>
+
+<script>
+// ===================== Automatic concentration control =====================
+// Closed loop, run from this page:
+//   1. read the tank once the sensor has settled,
+//   2. if outside the tolerance, work out how much dye (or clear water) brings
+//      it to the target from a simple mixing balance:
+//        dye  : v = V (T - C) / (C_res - T)        clear: v = V (C - T) / T
+//      take 80 % of that (less if it overshoots), at most the largest burst,
+//   3. run that pump for v / flow seconds at its panel speed,
+//   4. wait for the tank to mix, and repeat.
+// The waste pump flushes after `flush after` mL of dye + clear has gone in,
+// and earlier if the next burst would take the tank past 430 mL.
+const AUTO = { running: false, abort: null, gain: 0.8, lastSign: 0 };
+window.autoTarget = null;
+sensor.events = [];
+const SAFE_TOP = 430;          // never dose above this estimated level (limit 450)
+const MIN_BURST_S = 0.5;       // shortest pump run
+const DROP_ML_A = 0.05, TANK_REF_ML = 350;
+
+const aEl = id => document.getElementById(id);
+const toML = v => `${Math.round(v)} mL`;
+function resConc() { // reservoir concentration, mL/L (mL food dye per L)
+  const d = +aEl('aResDrops').value, vol = +aEl('aResVol').value;
+  return d > 0 && vol > 0 ? d * DROP_ML_A / vol * 1000 : NaN;
+}
+function calMaxConc() { // highest concentration the calibration covers, mL/L
+  const ac = sensor.arduinoCal;
+  return ac ? Math.max(0, ac.b0 + ac.b1 * ac.amax) * 1000 : NaN;
+}
+function autoHints() {
+  const T = +aEl('aTarget').value, cr = resConc(), cm = calMaxConc();
+  aEl('aResHint').textContent = Number.isFinite(cr) ? `= ${cr.toFixed(3)} mL/L in the reservoir` : '';
+  const h = aEl('aTargetHint');
+  h.classList.remove('bad');
+  let txt = `≈ ${(T / 1000 * TANK_REF_ML / DROP_ML_A).toFixed(1)} drops in 350 mL`;
+  if (!(T > 0)) { txt = 'Enter a target above 0.'; h.classList.add('bad'); }
+  else if (T >= cr) { txt = `Must be below the reservoir (${cr.toFixed(3)} mL/L): dye cannot get stronger than its source.`; h.classList.add('bad'); }
+  else if (Number.isFinite(cm) && T > cm * 1.02) { txt += `. Above the calibrated range (max ${cm.toFixed(3)}), so readings there are estimates.`; h.classList.add('bad'); }
+  else if (sensor.arduinoCal && T < Math.max(0, sensor.arduinoCal.b0 + sensor.arduinoCal.b1 * sensor.arduinoCal.amin) * 1000 * 0.98) { txt += `. Below the calibrated range (min ${(Math.max(0, sensor.arduinoCal.b0 + sensor.arduinoCal.b1 * sensor.arduinoCal.amin) * 1000).toFixed(3)}), so readings there are estimates.`; h.classList.add('bad'); }
+  h.textContent = txt;
+}
+for (const id of ['aTarget', 'aResDrops', 'aResVol']) aEl(id).addEventListener('input', autoHints);
+
+function stepLog(msg) {
+  const d = document.createElement('div');
+  d.textContent = `${new Date().toLocaleTimeString()}  ${msg}`;
+  aEl('aSteps').prepend(d);
+  log(`[auto] ${msg}`);
+}
+function autoStatus(msg, cls = '') { const s = aEl('aStatus'); s.textContent = msg; s.className = `status ${cls}`; }
+function autoUpdateNums() {
+  const s = sensor.last;
+  aEl('aMeas').textContent = s && Number.isFinite(s.conc) ? `${(s.conc * 1000).toFixed(3)} mL/L` : '–';
+  aEl('aTgt').textContent = window.autoTarget != null ? `${window.autoTarget.toFixed(3)} mL/L ± ${(+aEl('aTol').value).toFixed(3)}` : '–';
+  aEl('aTank').textContent = toML(tankMl);
+  aEl('aDye').textContent = toML(AUTO.dye || 0);
+  aEl('aClear').textContent = toML(AUTO.clear || 0);
+  aEl('aFlushed').textContent = toML(AUTO.flushed || 0);
+  aEl('aSince').textContent = `${toML(AUTO.since || 0)} of ${+aEl('aFlush').value}`;
+}
+setInterval(autoUpdateNums, 500);
+
+window.autoRender = function () {
+  aEl('aStart').disabled = !connected || AUTO.running;
+  aEl('aStop').disabled = !AUTO.running;
+  for (const id of ['aTarget', 'aResDrops', 'aResVol', 'aTol', 'aMix', 'aBurst', 'aFlush']) aEl(id).disabled = AUTO.running;
+};
+
+const asleep = (ms, signal) => new Promise((res, rej) => {
+  if (signal.aborted) return rej(new Error('stopped'));
+  const t = setTimeout(res, ms);
+  signal.addEventListener('abort', () => { clearTimeout(t); rej(new Error('stopped')); }, { once: true });
+});
+
+// Wait until the reading is steady, then return the average of the last 6 s (mL/L).
+async function settledConc(signal, tol) {
+  const start = Date.now();
+  while (true) {
+    const s = sensor.last;
+    if (!s || !Number.isFinite(s.f)) throw new Error('No signal from the sensor');
+    if (!Number.isFinite(s.conc)) throw new Error('No concentration: the sensor has no matching calibration');
+    const win = sensor.history.filter(p => p.t > Date.now() - 6000 && Number.isFinite(p.conc)).map(p => p.conc * 1000);
+    if (win.length >= 8) {
+      const spread = Math.max(...win) - Math.min(...win);
+      const mean = win.reduce((a, b) => a + b, 0) / win.length;
+      if (spread <= Math.max(0.6 * tol, 0.006) || Date.now() - start > 60000) return mean;
+      autoStatus(`Waiting for a steady reading (spread ${spread.toFixed(3)} mL/L)`);
+    }
+    await asleep(1000, signal);
+  }
+}
+
+// Run one pump for a volume in mL at its panel speed; returns mL actually commanded.
+async function burst(id, ml, signal) {
+  const pwm = +ui[id].slider.value;
+  const flow = flowAt(id, pwm);
+  const secs = Math.min(ml / flow, capSecs(id, pwm) - 0.2);
+  const real = flow * secs;
+  const t0 = Date.now();
+  await send(`RUN ${id} ${pwm} ${secs.toFixed(2)}`);
+  const ev = { k: id, t0, t1: t0, ml: real };
+  sensor.events.push(ev);
+  try { await asleep(secs * 1000 + 400, signal); }
+  finally { ev.t1 = Date.now(); }
+  return real;
+}
+
+async function flush(ml, signal, why) {
+  ml = Math.min(ml, tankMl - TANK_MIN - 10);
+  if (ml < 5) return 0;
+  stepLog(`Flushing ≈ ${Math.round(ml)} mL (${why})`);
+  autoStatus(`Flushing ≈ ${Math.round(ml)} mL`);
+  let done = 0;
+  while (ml - done >= 5) {
+    done += await burst('W', ml - done, signal);
+  }
+  AUTO.flushed = (AUTO.flushed || 0) + done;
+  AUTO.since = Math.max(0, (AUTO.since || 0) - done);
+  await asleep(2000, signal);
+  return done;
+}
+
+async function autoRun() {
+  const T = +aEl('aTarget').value, cr = resConc(), tol = +aEl('aTol').value;
+  const mixS = +aEl('aMix').value, maxBurst = +aEl('aBurst').value, flushAfter = +aEl('aFlush').value;
+  if (!connected) return;
+  if (!(T > 0) || !(T < cr)) { autoHints(); notice('Check the target: it must be above 0 and below the reservoir concentration.', true); return; }
+  if (!sensor.last || !Number.isFinite(sensor.last.conc)) { notice('No concentration reading yet: the sensor needs a working calibration first.', true); return; }
+
+  AUTO.running = true; AUTO.abort = new AbortController(); AUTO.gain = 0.8; AUTO.lastSign = 0;
+  AUTO.dye = 0; AUTO.clear = 0; AUTO.flushed = 0; AUTO.since = 0;
+  window.autoTarget = T;
+  AUTO.startLevel = tankMl;
+  const { signal } = AUTO.abort;
+  aEl('aSteps').innerHTML = '';
+  stepLog(`Started: target ${T.toFixed(3)} mL/L, reservoir ${cr.toFixed(3)} mL/L, tank ≈ ${Math.round(tankMl)} mL`);
+  if (tankMl + 0 > SAFE_TOP) stepLog('Tank is high: it will flush before adding anything.');
+  render(); window.autoRender();
+  await send('STOP');
+
+  let inBand = 0;
+  try {
+    for (let round = 1; round <= 80; round++) {
+      autoStatus('Reading the tank');
+      const C = await settledConc(signal, tol);
+      const err = C - T;
+      if (Math.abs(err) <= tol) {
+        inBand++;
+        stepLog(`Reading ${C.toFixed(3)} mL/L: within ±${tol} (${inBand}/2)`);
+        if (inBand >= 2) {
+          autoStatus(`Target reached: ${C.toFixed(3)} mL/L`, 'ok');
+          stepLog('Target reached. Pumps off.');
+          notice(`Target reached: ${C.toFixed(3)} mL/L (target ${T.toFixed(3)}).`);
+          return;
+        }
+        await asleep(5000, signal);
+        continue;
+      }
+      inBand = 0;
+
+      // Overshoot check: if the error changed sign, dose more gently from now on.
+      const sign = Math.sign(err);
+      if (AUTO.lastSign && sign !== AUTO.lastSign) { AUTO.gain = Math.max(0.3, AUTO.gain * 0.7); stepLog(`Overshot: burst size reduced (gain ${AUTO.gain.toFixed(2)})`); }
+      AUTO.lastSign = sign;
+
+      const V = tankMl;
+      const id = err < 0 ? 'D' : 'C';
+      const need = err < 0 ? V * (T - C) / (cr - T) : V * (C - T) / T;
+      const minMl = flowAt(id, +ui[id].slider.value) * MIN_BURST_S;
+      const v = Math.min(maxBurst, Math.max(minMl, AUTO.gain * need));
+
+      // Flush rule (after `flushAfter` mL added) and overflow guard.
+      if ((AUTO.since || 0) + v > flushAfter) await flush(AUTO.since, signal, `${flushAfter} mL added since the last flush`);
+      if (tankMl + v > SAFE_TOP) await flush(Math.max(tankMl + v - SAFE_TOP + 20, tankMl - Math.min(AUTO.startLevel, SAFE_TOP - 60)), signal, 'keeping the tank below 450 mL');
+      if (tankMl + v > TANK_MAX) throw new Error('The tank is too full to dose safely');
+
+      const name = id === 'D' ? 'dye' : 'clear water';
+      autoStatus(`Adding ≈ ${Math.round(v)} mL ${name} (${C.toFixed(3)} → ${T.toFixed(3)} mL/L)`);
+      const real = await burst(id, v, signal);
+      if (id === 'D') AUTO.dye += real; else AUTO.clear += real;
+      AUTO.since = (AUTO.since || 0) + real;
+      stepLog(`Read ${C.toFixed(3)} mL/L, added ≈ ${Math.round(real)} mL ${name}`);
+
+      for (let s = mixS; s > 0; s--) { autoStatus(`Mixing… ${s} s`); await asleep(1000, signal); }
+    }
+    throw new Error('Gave up after 80 rounds without settling on the target');
+  } catch (e) {
+    await send('STOP');
+    if (e.message === 'stopped') { autoStatus(AUTO.stopReason || 'Stopped', AUTO.stopReason ? 'bad' : ''); stepLog(AUTO.stopReason || 'Stopped by you. Pumps off.'); }
+    else { autoStatus(`Stopped: ${e.message}`, 'bad'); stepLog(`Stopped: ${e.message}`); notice(`Automatic control stopped: ${e.message}. All pumps off.`, true); }
+  } finally {
+    AUTO.running = false; AUTO.abort = null; AUTO.stopReason = null;
+    render(); window.autoRender();
+  }
+}
+
+window.autoStop = function (reason) {
+  if (!AUTO.running) return;
+  AUTO.stopReason = reason || null;
+  AUTO.abort.abort();
+};
+window.isAutoRunning = () => AUTO.running;
+
+aEl('aStart').addEventListener('click', autoRun);
+aEl('aStop').addEventListener('click', () => { window.autoStop(); send('STOP'); });
+autoHints();
+window.autoRender();
+</script>
+</body>
+</html>
