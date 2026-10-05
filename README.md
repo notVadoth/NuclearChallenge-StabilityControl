@@ -6,8 +6,6 @@ Built on the challenge's base code: [IdeasClinicUWaterloo/F26-NuclearIC](https:/
 
 Canva view link: https://canva.link/ud9t2yi2hbv6vku
 
-Google docs view link: https://docs.google.com/document/d/1-GoW5N-BXc-cunrPMzWbaOq6qewn9IFudRMmZFtr4vw/edit?usp=sharing
-
 ## Contents
 
 | Folder | What it is |
