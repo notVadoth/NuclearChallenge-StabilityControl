@@ -18,6 +18,7 @@ Canva view link: https://canva.link/ud9t2yi2hbv6vku
 | `Docs/Nuclear Innovation Challenge.pptx` | Group 9's presentation: challenge problem, background, the control rod simulator, experiment and observations, setbacks, safety and regulations, citations and AI disclosure. |
 | `Docs/calibration-2026-10-03.svg` | Graph of the 3 Oct 2026 calibration: absorbance of the five standards against concentration, with the fitted line. |
 | `Media/` | Photos of the rig, the bench setup, the control app in use and the team. |
+| `Schematic/` | KiCad project of the rig's wiring (`dye-rig.kicad_sch`) and an SVG export of it (`dye-rig.svg`). |
 
 ## Hardware
 
@@ -26,6 +27,12 @@ Arduino UNO R4 Minima, SEN0101 (TCS3200) colour sensor, three 3 V pumps (dye, cl
 - Pumps: dye D3/D5, clear D6/D9, waste D10/D11 (PWM pin / held LOW)
 - Sensor: OUT D2, S0 D4, S1 D7, S2 D8, S3 D12, OE to GND
 - Sensor read through the red filter at 100 % scaling (green dye absorbs red); ambient room lighting
+
+### Schematic
+
+Drawn in KiCad; open `Schematic/dye-rig.kicad_pro` to edit it. The 9 V battery feeds both drivers' VCC, and its negative side is the common ground shared with the Arduino and the sensor. Driver 1 runs the dye pump (IN1/IN2 → OUT1/OUT2) and the clear pump (IN3/IN4 → OUT3/OUT4); driver 2 runs the waste pump (IN1/IN2 → OUT1/OUT2).
+
+![Wiring schematic: Arduino UNO R4 Minima, SEN0101 colour sensor, two DRV8833 driver modules, three pumps and the 9 V battery](Schematic/dye-rig.svg)
 
 ## Running it
 
